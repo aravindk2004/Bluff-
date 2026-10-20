@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { HeuristicAi } from '../ai/heuristic';
 import { buildReport, type DecisionRecord, type HandReport } from '../coach/analyze';
 import type { DrillId } from '../coach/drills';
-import { type Action, createGame, type GameState, type HandEvent, isGameOver, type LegalActions, playerView } from '../engine';
+import { type Action, createGame, type GameState, type HandEvent, isGameOver, type LegalActions, type Player, playerView, type RiggedDeal } from '../engine';
 import { HumanPlayer, TableController } from '../game/controller';
-import { BOTS } from './bots';
+import { ALL_CHARACTERS, BOTS, type BotProfile, HIGH_ROLLERS, type QuipEvent } from './bots';
 import { useProgress } from './progress';
 import { isMuted, play, setMuted } from './sfx';
 import { computeLiveOdds } from './useLiveOdds';
@@ -21,8 +21,24 @@ export const DEFAULT_SETTINGS: Settings = { opponents: 4, startingStack: 1000, b
 
 export type Screen = 'menu' | 'table' | 'school' | 'tutorial' | 'drill';
 
+/** Classic tables, the High Stakes penthouse, or the guided tutorial game. */
+export type Mode = 'classic' | 'highStakes' | 'tutorial';
+
+export const HIGH_STAKES = { smallBlind: 5_000, bigBlind: 10_000, startingStack: 1_000_000 };
+
+export interface Quip {
+  id: number;
+  text: string;
+}
+
 interface Store {
   screen: Screen;
+  mode: Mode;
+  /** Latest line of banter per seat (shown as a speech bubble). */
+  quips: Record<number, Quip>;
+  /** Tutorial hook: return a message to block an action (it is shown instead). */
+  actGate: ((action: Action) => string | null) | null;
+  gateMessage: string | null;
   drill: DrillId | null;
   settings: Settings;
   /** Game state as the human is allowed to see it. */
@@ -50,10 +66,15 @@ interface Store {
 
   toggleLog: () => void;
   go: (screen: Screen, drill?: DrillId) => void;
-  startGame: (settings: Settings) => void;
+  startGame: (settings: Settings, mode?: Mode) => void;
+  /** Start a table with custom players (used by the tutorial game). */
+  startCustom: (game: GameState, bots: Player[], mode: Mode) => void;
+  setActGate: (gate: Store['actGate']) => void;
   act: (action: Action) => void;
-  nextHand: () => void;
+  nextHand: (rig?: RiggedDeal) => void;
   quitToMenu: () => void;
+  /** Leave the table for another screen (stops the game). */
+  leaveTable: (screen: Screen) => void;
   toggleMute: () => void;
   setShowRankings: (v: boolean) => void;
   setShowCoach: (v: boolean) => void;
@@ -63,8 +84,14 @@ interface Store {
 let controller: TableController | null = null;
 let human: HumanPlayer | null = null;
 
+let quipId = 0;
+
 export const useGame = create<Store>((set, get) => ({
   screen: 'menu',
+  mode: 'classic',
+  quips: {},
+  actGate: null,
+  gateMessage: null,
   drill: null,
   settings: DEFAULT_SETTINGS,
   view: null,
@@ -87,40 +114,53 @@ export const useGame = create<Store>((set, get) => ({
   toggleLog: () => set({ showLog: !get().showLog }),
   go: (screen, drill) => set({ screen, drill: drill ?? null }),
 
-  startGame: (settings) => {
-    controller?.stop();
-    const bots = BOTS.slice(0, settings.opponents);
+  startGame: (settings, mode = 'classic') => {
+    const high = mode === 'highStakes';
+    // High Stakes seats a random selection of the high rollers each time.
+    const bots = high ? shuffleCopy(HIGH_ROLLERS).slice(0, settings.opponents) : BOTS.slice(0, settings.opponents);
     const seed = (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0;
     const game = createGame(
-      {
-        smallBlind: Math.max(1, Math.floor(settings.bigBlind / 2)),
-        bigBlind: settings.bigBlind,
-        ante: 0,
-        startingStack: settings.startingStack,
-      },
-      [{ id: 'you', name: 'You' }, ...bots.map((b) => ({ id: b.id, name: b.name }))],
+      high
+        ? { smallBlind: HIGH_STAKES.smallBlind, bigBlind: HIGH_STAKES.bigBlind, ante: 0, startingStack: HIGH_STAKES.startingStack }
+        : {
+            smallBlind: Math.max(1, Math.floor(settings.bigBlind / 2)),
+            bigBlind: settings.bigBlind,
+            ante: 0,
+            startingStack: settings.startingStack,
+          },
+      [{ id: 'you', name: 'You' }, ...bots.map((b) => ({ id: b.id, name: b.short ?? b.name }))],
       seed,
     );
+    const ais = bots.map((b) => new HeuristicAi(b.id, { style: b.style, thinkMs: b.thinkMs }));
+    set({ settings });
+    get().startCustom(game, ais, mode);
+  },
+
+  startCustom: (game, bots, mode) => {
+    controller?.stop();
     human = new HumanPlayer('you');
     human.onTurn = (legal) => {
       play('turn');
       set({ legal, turnStartedAt: Date.now() });
     };
-    const ais = bots.map((b) => new HeuristicAi(b.id, { style: b.style, thinkMs: b.thinkMs }));
-    controller = new TableController(game, [human, ...ais]);
+    controller = new TableController(game, [human, ...bots]);
     let seen = { hand: 0, len: 0 };
     controller.subscribe((s) => {
       const newHand = s.handNumber !== seen.hand;
       const fresh = newHand ? s.log : s.log.slice(seen.len);
       seen = { hand: s.handNumber, len: s.log.length };
       playSoundsFor(fresh, s);
+      if (get().mode !== 'tutorial') banter(fresh, s, newHand, get().mode === 'highStakes', set, get);
       if (fresh.some((e) => e.kind === 'action' && e.allIn)) set({ shake: get().shake + 1 });
       const view = playerView(s, HUMAN_SEAT);
       set({ view, history: newHand ? [view] : [...get().history, view] });
     });
     set({
       screen: 'table',
-      settings,
+      mode,
+      quips: {},
+      actGate: null,
+      gateMessage: null,
       view: playerView(game, HUMAN_SEAT),
       legal: null,
       gameOver: false,
@@ -130,25 +170,34 @@ export const useGame = create<Store>((set, get) => ({
       report: null,
       showCoach: false,
     });
-    get().nextHand();
+    // The tutorial deals its own (rigged) hands.
+    if (mode !== 'tutorial') get().nextHand();
   },
+
+  setActGate: (gate) => set({ actGate: gate, gateMessage: null }),
 
   act: (action) => {
     if (!human?.waiting) return;
+    const blocked = get().actGate?.(action) ?? null;
+    if (blocked) {
+      play('wrong');
+      set({ gateMessage: blocked });
+      return;
+    }
     const { view, legal } = get();
     if (view && legal) {
       const rec = buildDecision(view, legal, action);
       if (rec) set({ decisions: [...get().decisions, rec] });
     }
-    set({ legal: null, turnStartedAt: null });
+    set({ legal: null, turnStartedAt: null, gateMessage: null });
     human.act(action);
   },
 
-  nextHand: () => {
+  nextHand: (rig) => {
     const ctl = controller;
     if (!ctl || get().handRunning || get().gameOver) return;
-    set({ handRunning: true, decisions: [], report: null, showCoach: false, showReplay: false });
-    void ctl.playHand().then((s) => {
+    set({ handRunning: true, decisions: [], report: null, showCoach: false, showReplay: false, quips: {} });
+    void ctl.playHand(rig).then((s) => {
       if (ctl !== controller) return; // game was restarted
       const humanBroke = s.seats[HUMAN_SEAT].stack === 0;
       const result = s.result;
@@ -164,7 +213,7 @@ export const useGame = create<Store>((set, get) => ({
         gameOver: humanBroke || isGameOver(s),
         lastNet: result ? net : null,
         report,
-        showCoach: useProgress.getState().settings.coach && report.verdict !== 'quiet',
+        showCoach: (useProgress.getState().settings.coach || get().mode === 'tutorial') && report.verdict !== 'quiet',
       });
     });
   },
@@ -173,7 +222,25 @@ export const useGame = create<Store>((set, get) => ({
     controller?.stop();
     controller = null;
     human = null;
-    set({ screen: 'menu', view: null, legal: null, handRunning: false, gameOver: false, report: null, showCoach: false, showReplay: false });
+    set({
+      screen: 'menu',
+      mode: 'classic',
+      view: null,
+      legal: null,
+      handRunning: false,
+      gameOver: false,
+      report: null,
+      showCoach: false,
+      showReplay: false,
+      quips: {},
+      actGate: null,
+      gateMessage: null,
+    });
+  },
+
+  leaveTable: (screen) => {
+    get().quitToMenu();
+    set({ screen });
   },
 
   toggleMute: () => {
@@ -255,5 +322,60 @@ function playSoundsFor(fresh: HandEvent[], s: GameState) {
       // Bets get swept into the pot before the new cards land.
       play('collect');
     }
+  }
+}
+
+function shuffleCopy<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** How likely a character is to speak at each moment (high rollers are chattier). */
+const QUIP_ODDS: Record<QuipEvent, number> = { greet: 0.35, fold: 0.2, check: 0.1, call: 0.35, raise: 0.5, allIn: 0.95, win: 0.8, lose: 0.45 };
+
+function profileOf(s: GameState, seat: number): BotProfile | undefined {
+  return ALL_CHARACTERS.find((b) => b.id === s.seats[seat].id);
+}
+
+/** Pick a line of banter for game events, and show it as a speech bubble on that seat. */
+function banter(
+  fresh: HandEvent[],
+  s: GameState,
+  newHand: boolean,
+  chatty: boolean,
+  set: (p: Partial<Store>) => void,
+  get: () => Store,
+) {
+  const say = (seat: number, event: QuipEvent) => {
+    if (seat === HUMAN_SEAT) return;
+    const lines = profileOf(s, seat)?.lines?.[event];
+    if (!lines?.length) return;
+    if (Math.random() > QUIP_ODDS[event] * (chatty ? 1 : 0.55)) return;
+    const text = lines[Math.floor(Math.random() * lines.length)];
+    set({ quips: { ...get().quips, [seat]: { id: ++quipId, text } } });
+  };
+  if (newHand && s.handNumber === 1) {
+    // Someone says hello at the start of a session.
+    const seats = s.seats.map((_, i) => i).filter((i) => i !== HUMAN_SEAT);
+    const seat = seats[Math.floor(Math.random() * seats.length)];
+    const lines = profileOf(s, seat)?.lines?.greet;
+    if (lines?.length) set({ quips: { [seat]: { id: ++quipId, text: lines[0] } } });
+  }
+  for (const e of fresh) {
+    if (e.kind === 'action') {
+      const ev: QuipEvent = e.allIn ? 'allIn' : e.action === 'bet' || e.action === 'raise' ? 'raise' : e.action;
+      say(e.seat, ev);
+    }
+  }
+  if (s.phase !== 'betting' && s.result && fresh.some((e) => e.kind === 'win')) {
+    const net = s.result.netBySeat;
+    const winner = net.indexOf(Math.max(...net));
+    const loser = net.indexOf(Math.min(...net));
+    say(winner, 'win');
+    if (loser !== winner && net[loser] < 0) say(loser, 'lose');
   }
 }

@@ -5,7 +5,8 @@ import { play } from './sfx';
 /** Player progress and School settings, saved in this browser. */
 
 export const BADGES = {
-  firstSteps: { name: 'First Steps', text: 'Finish the tutorial', color: '#3aa86b', glyph: '1' },
+  firstSteps: { name: 'First Steps', text: 'Finish the quick lessons', color: '#3aa86b', glyph: '1' },
+  graduate: { name: 'Graduate', text: 'Finish the tutorial game', color: '#ffcc3d', glyph: 'G' },
   potOdds: { name: 'Odds On', text: 'Score 8+ in the Pot Odds drill', color: '#2d8ff0', glyph: '%' },
   outs: { name: 'Out Counter', text: 'Score 8+ in the Outs drill', color: '#3aa86b', glyph: '+' },
   position: { name: 'Seat Smart', text: 'Score 8+ in the Position drill', color: '#ee7d17', glyph: 'D' },
@@ -43,6 +44,7 @@ interface ProgressState {
   award: (id: BadgeId) => void;
   recordDrill: (id: DrillId, score: number) => void;
   finishTutorial: () => void;
+  finishTutorialGame: () => void;
   setSetting: (key: keyof SchoolSettings, value: boolean) => void;
   noteHand: (cleanDecisions: boolean) => void;
   dismissToast: (id: number) => void;
@@ -116,6 +118,10 @@ export const useProgress = create<ProgressState>((set, get) => {
       if (first) get().addXp(100, 'tutorial');
       get().award('firstSteps');
       persist();
+    },
+    finishTutorialGame: () => {
+      if (!get().badges.includes('graduate')) get().addXp(150, 'tutorial game');
+      get().award('graduate');
     },
     setSetting: (key, value) => {
       set({ settings: { ...get().settings, [key]: value } });

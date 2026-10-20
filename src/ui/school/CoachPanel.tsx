@@ -22,6 +22,7 @@ export function CoachPanel() {
   const show = useGame((s) => s.showCoach);
   const setShow = useGame((s) => s.setShowCoach);
   const setReplay = useGame((s) => s.setShowReplay);
+  const tutorial = useGame((s) => s.mode === 'tutorial');
   const [term, setTerm] = useState<GlossaryKey | null>(null);
   const terms = [...new Set(report?.points.flatMap((p) => p.terms) ?? [])];
 
@@ -37,6 +38,7 @@ export function CoachPanel() {
           className="ppanel fixed inset-x-2 bottom-2 z-[120] flex max-h-[62dvh] flex-col gap-2 p-2.5 sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:w-[22rem] sm:max-h-[calc(100dvh-1.5rem)]"
           style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
           aria-label="Coach's notes"
+          data-tour="coach"
         >
           <div className="flex items-center gap-2">
             <div className="txt flex-1 rounded-lg px-2 py-1 text-center text-xl" style={{ background: VERDICT_STYLE[report.verdict].bg, boxShadow: `0 4px 0 ${VERDICT_STYLE[report.verdict].base}` }}>
@@ -95,13 +97,21 @@ export function CoachPanel() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 ${tutorial ? 'grid-cols-1' : 'grid-cols-2'}`}>
             <button className="pbtn pbtn-orange text-lg" onClick={() => setReplay(true)}>
               Replay hand
             </button>
-            <button className="pbtn pbtn-blue text-lg" onClick={() => { setShow(false); useGame.getState().nextHand(); }}>
-              Next hand
-            </button>
+            {!tutorial && (
+              <button
+                className="pbtn pbtn-blue text-lg"
+                onClick={() => {
+                  setShow(false);
+                  useGame.getState().nextHand();
+                }}
+              >
+                Next hand
+              </button>
+            )}
           </div>
         </motion.aside>
       )}

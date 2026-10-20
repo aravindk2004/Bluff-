@@ -14,6 +14,8 @@ export default function App() {
   const screen = useGame((s) => s.screen);
   const drill = useGame((s) => s.drill);
   const mood = useMood();
+  const mode = useGame((s) => s.mode);
+  const themed = screen === 'table' && mode === 'highStakes';
 
   // Every chunky button gets a press click.
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function App() {
   }, [screen]);
 
   return (
-    <div className="crt h-full">
+    <div className="crt h-full" data-mode={themed ? 'highStakes' : undefined}>
       <SwirlBackground mood={mood} />
       {screen === 'menu' && <Menu />}
       {screen === 'table' && <TableScreen />}

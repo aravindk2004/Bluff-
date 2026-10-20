@@ -10,6 +10,7 @@ import {
   type LegalActions,
   type Player,
   playerView,
+  type RiggedDeal,
   startHand,
 } from '../engine';
 
@@ -84,9 +85,9 @@ export class TableController {
     for (const fn of this.listeners) fn(s);
   }
 
-  /** Deal and play one complete hand. Resolves with the finished state. */
-  async playHand(): Promise<GameState> {
-    this.set(startHand(this.state));
+  /** Deal and play one complete hand (optionally with fixed cards). Resolves with the finished state. */
+  async playHand(rig?: RiggedDeal): Promise<GameState> {
+    this.set(startHand(this.state, rig));
     while (this.state.phase === 'betting' && !this.stopped) {
       const seat = this.state.toAct!;
       const legal = legalActions(this.state);

@@ -4,7 +4,7 @@ import { collectedPot, type GameState } from '../../engine';
 import { feedLines } from '../derive';
 import { CardSlot, PlayingCard } from '../PlayingCard';
 import { HUMAN_SEAT, useGame } from '../store';
-import { Portrait, profileFor } from '../widgets';
+import { fmtChips, Portrait, profileFor } from '../widgets';
 
 /**
  * Step through the hand you just played. Each step is the table as you saw it after one action.
@@ -79,7 +79,7 @@ export function Replay() {
             </div>
 
             <div className="ptray flex flex-col items-center gap-2 p-2">
-              <div className="txt text-sm text-white/80">Pot {(collectedPot(snap) + snap.seats.reduce((a, p) => a + p.bet, 0)).toLocaleString()}</div>
+              <div className="txt text-sm text-white/80">Pot {fmtChips(collectedPot(snap) + snap.seats.reduce((a, p) => a + p.bet, 0))}</div>
               <div className="flex gap-1">
                 {Array.from({ length: 5 }, (_, i) =>
                   snap.board[i] ? (
@@ -156,7 +156,7 @@ function ReplaySeat({ snap, final, seat, reveal }: { snap: GameState; final: Gam
       <div className="min-w-0 flex-1">
         <div className="txt truncate text-sm leading-tight">{seat === HUMAN_SEAT ? 'You' : p.name}</div>
         <div className="txt text-xs leading-tight text-gold">
-          ${p.stack.toLocaleString()}
+          ${fmtChips(p.stack)}
           {p.bet > 0 && <span className="text-white/70"> · bet {p.bet}</span>}
           {p.folded && <span className="text-white/60"> · folded</span>}
           {!p.folded && acted?.kind === 'action' && !p.bet && <span className="text-white/60"> · {acted.action}</span>}

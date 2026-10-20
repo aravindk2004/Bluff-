@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { BADGES, type BadgeId, levelFor, type SchoolSettings, useProgress } from '../progress';
 import { useGame } from '../store';
 import { useDrillList } from './Drill';
+import { useTutorial } from './tutorialGame';
 
 const TOGGLES: { key: keyof SchoolSettings; name: string; text: string }[] = [
   { key: 'trainingWheels', name: 'Training wheels', text: 'Live win chance, outs and pot odds while you play.' },
@@ -53,13 +54,17 @@ export function SchoolHub() {
 
       <div className="grid gap-3 md:grid-cols-[1.2fr_1fr]">
         <div className="flex flex-col gap-3">
-          {/* Tutorial */}
-          <button
-            className="pbtn pbtn-blue flex flex-col items-start gap-0.5 px-3 py-3 text-left"
-            onClick={() => go('tutorial')}
-          >
-            <span className="text-2xl">{p.tutorialDone ? 'Replay the tutorial' : 'Start here: the tutorial'}</span>
-            <span className="text-sm text-white/85">Hand rankings, how a hand flows, the betting actions, position and pot odds. About 5 minutes.</span>
+          {/* Tutorial game */}
+          <button className="pbtn pbtn-gold flex flex-col items-start gap-0.5 px-3 py-3 text-left" onClick={() => useTutorial.getState().start()}>
+            <span className="text-2xl">{p.badges.includes('graduate') ? 'Replay the tutorial game' : 'Start here: the tutorial game'}</span>
+            <span className="text-sm">
+              Play three guided hands at a real table. Professor Pip shows you every part of the screen and the rules as you go. About 5 minutes.
+            </span>
+          </button>
+          {/* Quick lessons */}
+          <button className="pbtn pbtn-blue flex flex-col items-start gap-0.5 px-3 py-2.5 text-left" onClick={() => go('tutorial')}>
+            <span className="text-xl">{p.tutorialDone ? 'Quick lessons (done)' : 'Quick lessons'}</span>
+            <span className="text-sm text-white/85">Hand rankings, how a hand flows, betting actions, position and pot odds, with quizzes.</span>
           </button>
 
           {/* Drills */}

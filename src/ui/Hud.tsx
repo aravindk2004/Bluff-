@@ -3,7 +3,7 @@ import { collectedPot, type GameState } from '../engine';
 import { currentHandName, STREET_NAME } from './derive';
 import { WheelsPanel } from './school/TrainingWheels';
 import { HUMAN_SEAT, useGame } from './store';
-import { AnimatedNumber, ChipIcon, positionName, StatTile } from './widgets';
+import { AnimatedNumber, ChipIcon, fmtChips, positionName, StatTile } from './widgets';
 
 const STREET_COLORS: Record<string, string> = {
   preflop: '#2d8ff0',
@@ -44,9 +44,15 @@ export function Hud({ view }: { view: GameState }) {
   const muted = useGame((s) => s.muted);
   const toggleMute = useGame((s) => s.toggleMute);
   const odds = potOddsText(d.pot, d.toCall);
+  const high = useGame((s) => s.mode === 'highStakes');
 
   return (
     <aside className="flex h-full flex-col gap-2 overflow-y-auto bg-slate-deep/80 p-2.5 shadow-[4px_0_0_rgba(0,0,0,0.25)]">
+      {high && (
+        <div className="rounded-md bg-gold py-0.5 text-center text-lg leading-tight text-ink" style={{ boxShadow: '0 3px 0 #b88a12' }}>
+          ★ The Penthouse ★
+        </div>
+      )}
       {/* Street header */}
       <motion.div
         key={d.streetLabel}
@@ -59,7 +65,7 @@ export function Hud({ view }: { view: GameState }) {
       </motion.div>
 
       {/* Pot block */}
-      <div className="ppanel flex items-center gap-2 p-2">
+      <div data-tour="pot" className="ppanel flex items-center gap-2 p-2">
         <div
           className="txt flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full text-center text-[11px] font-bold leading-tight"
           style={{ background: d.color, boxShadow: 'inset 0 -4px 0 rgba(0,0,0,0.25), 0 3px 0 rgba(0,0,0,0.3)' }}
@@ -74,7 +80,7 @@ export function Hud({ view }: { view: GameState }) {
             <AnimatedNumber value={d.pot} />
           </div>
           <div className="txt text-xs text-white/80">
-            Blinds <span className="text-gold">{view.config.smallBlind}/{view.config.bigBlind}</span>
+            Blinds <span className="text-gold">{fmtChips(view.config.smallBlind, true)}/{fmtChips(view.config.bigBlind, true)}</span>
           </div>
         </div>
       </div>
@@ -88,7 +94,7 @@ export function Hud({ view }: { view: GameState }) {
       </div>
 
       {/* Hand + pot odds */}
-      <div className="ppanel p-2">
+      <div data-tour="handinfo" className="ppanel p-2">
         <div className="txt min-h-[2.2rem] text-center text-2xl font-bold leading-tight">
           {d.me.folded ? 'Folded' : d.handName ?? '—'}
         </div>
@@ -122,7 +128,7 @@ export function Hud({ view }: { view: GameState }) {
       <WheelsPanel view={view} />
 
       {/* Buttons + stats */}
-      <div className="grid grid-cols-[1fr_2fr] gap-2">
+      <div data-tour="menu" className="grid grid-cols-[1fr_2fr] gap-2">
         <div className="flex flex-col gap-2">
           <button className="pbtn pbtn-orange flex-1 px-1 text-lg leading-tight" onClick={quit}>
             Menu
@@ -143,7 +149,7 @@ export function Hud({ view }: { view: GameState }) {
           </StatTile>
           <StatTile label="Last hand" className="col-span-2">
             <span className={lastNet === null ? 'text-white/50' : lastNet >= 0 ? 'text-gold' : 'text-red'}>
-              {lastNet === null ? '—' : `${lastNet >= 0 ? '+' : ''}${lastNet.toLocaleString()}`}
+              {lastNet === null ? '—' : `${lastNet >= 0 ? '+' : ''}${fmtChips(lastNet)}`}
             </span>
           </StatTile>
           <button className="pbtn pbtn-slate px-1 py-1.5 text-sm" onClick={toggleLog}>
@@ -170,7 +176,7 @@ export function HudStrip({ view }: { view: GameState }) {
         {d.streetLabel}
         <span className="text-[10px] text-white/80">#{view.handNumber}</span>
       </div>
-      <div className="ppanel flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-0.5">
+      <div data-tour="pot" className="ppanel flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-0.5">
         <div className="text-[10px] text-white/70">Pot</div>
         <div className="txt flex items-center gap-1 text-lg font-bold leading-none text-red">
           <ChipIcon className="w-3" />
@@ -183,6 +189,7 @@ export function HudStrip({ view }: { view: GameState }) {
           $<AnimatedNumber value={d.me.stack} />
         </div>
       </div>
+      <div data-tour="menu" className="flex shrink-0 gap-1.5">
       <button className="pbtn pbtn-slate shrink-0 px-1.5 py-0 text-xs" onClick={toggleLog}>
         Log
       </button>
@@ -192,6 +199,7 @@ export function HudStrip({ view }: { view: GameState }) {
       <button className="pbtn pbtn-orange shrink-0 px-1.5 py-0 text-xs" onClick={quit}>
         Menu
       </button>
+      </div>
     </div>
   );
 }

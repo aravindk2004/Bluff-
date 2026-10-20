@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export type Mood = 'menu' | 'calm' | 'tense' | 'win' | 'lose';
+export type Mood = 'menu' | 'calm' | 'tense' | 'win' | 'lose' | 'vip';
 
 /** Three swirl colours per mood (dark, mid, light), as 0..1 RGB. */
 const MOODS: Record<Mood, number[][]> = {
@@ -9,6 +9,8 @@ const MOODS: Record<Mood, number[][]> = {
   tense: [hex('#3d1418'), hex('#6e2228'), hex('#a8443a')],
   win: [hex('#4a3510'), hex('#7a5a18'), hex('#c9952e')],
   lose: [hex('#1c1a2e'), hex('#2c2a48'), hex('#45436a')],
+  // High Stakes penthouse: black velvet, aubergine and gold leaf.
+  vip: [hex('#120b18'), hex('#2e1638'), hex('#8a6a1e')],
 };
 
 function hex(h: string) {

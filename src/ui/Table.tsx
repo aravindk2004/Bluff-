@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { blindSeats, type Card, type GameState, type SeatState } from '../engine';
 import { lastActionLabels, STREET_NAME } from './derive';
 import { CardSlot, PlayingCard } from './PlayingCard';
 import { playLater } from './sfx';
-import { HUMAN_SEAT } from './store';
-import { ChipIcon, deckRemaining, Portrait, profileFor } from './widgets';
+import { HUMAN_SEAT, type Quip, useGame } from './store';
+import { ChipIcon, deckRemaining, Portrait, profileFor, fmtChips } from './widgets';
 
 const TURN_SECONDS = 30;
 // Sizes come from CSS variables in index.css so they adapt to phone portrait/landscape.
@@ -46,7 +46,7 @@ export function Opponents({ view }: { view: GameState }) {
   const { sb, bb } = view.handNumber > 0 ? blindSeats(view) : { sb: -1, bb: -1 };
   const seats = view.seats.map((p, i) => ({ p, i })).filter(({ i }) => i !== HUMAN_SEAT);
   return (
-    <div className="grid grid-cols-3 justify-items-center gap-x-1.5 gap-y-9 pt-9 cramped:gap-y-1 cramped:pt-2 sm:flex sm:justify-center sm:gap-3 sm:pt-12 short:pt-8">
+    <div data-tour="opponents" className="grid grid-cols-3 justify-items-center gap-x-1.5 gap-y-9 pt-9 cramped:gap-y-1 cramped:pt-2 sm:flex sm:justify-center sm:gap-3 sm:pt-12 short:pt-8">
       {seats.map(({ p, i }) => (
         <OpponentPanel
           key={p.id}
@@ -78,6 +78,7 @@ function OpponentPanel({
   outcome: ReturnType<typeof useOutcome>;
 }) {
   const prof = profileFor(seat.id);
+  const quip = useGame((s) => s.quips[index]);
   const acting = view.phase === 'betting' && view.toAct === index;
   const isWinner = outcome.winners.has(index);
   const net = outcome.result?.netBySeat[index] ?? 0;
@@ -106,7 +107,7 @@ function OpponentPanel({
           <div className="min-w-0 flex-1">
             <div className="txt truncate text-sm font-bold leading-tight cramped:pr-2 sm:text-base">{seat.name}</div>
             <div className="pinset txt mt-0.5 px-1 text-sm font-bold leading-tight text-gold sm:text-base">
-              {seat.out ? 'OUT' : `$${seat.stack.toLocaleString()}`}
+              {seat.out ? 'OUT' : `$${fmtChips(seat.stack)}`}
             </div>
           </div>
         </div>
@@ -141,6 +142,8 @@ function OpponentPanel({
         {acting && <TimerBar key={`${view.handNumber}-${view.log.length}`} />}
       </motion.div>
 
+      <SpeechBubble quip={quip} />
+
       {/* Bubble: action / bet / result */}
       <div className="mt-1 flex h-6 items-center gap-1 short:mt-0.5 short:h-5">
         <AnimatePresence mode="popLayout">
@@ -163,6 +166,36 @@ function OpponentPanel({
         </motion.div>
       )}
     </div>
+  );
+}
+
+/** Banter from a character, shown for a few seconds below their panel. */
+function SpeechBubble({ quip }: { quip?: Quip }) {
+  const [shown, setShown] = useState<Quip | null>(null);
+  useEffect(() => {
+    if (!quip) return;
+    setShown(quip);
+    const t = setTimeout(() => setShown((q) => (q?.id === quip.id ? null : q)), 3200);
+    return () => clearTimeout(t);
+  }, [quip]);
+  return (
+    <AnimatePresence>
+      {shown && (
+        <motion.div
+          key={shown.id}
+          initial={{ scale: 0.3, opacity: 0, y: -6, rotate: -4 }}
+          animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
+          exit={{ scale: 0.6, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+          className="pointer-events-none absolute inset-x-0 top-[calc(100%+0.25rem)] z-50 rounded-lg bg-paper px-1.5 py-1 text-center text-xs leading-tight text-ink sm:text-sm"
+          style={{ boxShadow: '0 3px 0 rgba(0,0,0,0.35)' }}
+          role="status"
+        >
+          <span className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-paper" />
+          <span className="relative">{shown.text}</span>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -217,7 +250,7 @@ function NetPill({
         net > 0 ? 'bg-gold text-ink [text-shadow:none]' : 'bg-black/45 text-white/70'
       }`}
     >
-      {net > 0 ? `+${net.toLocaleString()}` : net.toLocaleString()}
+      {net > 0 ? `+${fmtChips(net)}` : fmtChips(net)}
     </motion.div>
   );
 }
@@ -249,7 +282,7 @@ export function BetPill({ amount }: { amount: number }) {
       style={{ boxShadow: '0 2px 0 rgba(0,0,0,0.35)' }}
     >
       <ChipIcon className="w-3" />
-      {amount.toLocaleString()}
+      {fmtChips(amount)}
     </motion.div>
   );
 }
@@ -268,7 +301,7 @@ export function Board({ view }: { view: GameState }) {
   const remaining = deckRemaining(view);
   return (
     <div className="flex w-full items-center justify-center gap-2 sm:gap-4">
-      <div className="ptray relative flex flex-col items-center gap-1 px-2 pb-2 pt-7 cramped:pt-5 sm:px-4 sm:pt-8 short:pb-1.5 short:pt-5">
+      <div data-tour="board" className="ptray relative flex flex-col items-center gap-1 px-2 pb-2 pt-7 cramped:pt-5 sm:px-4 sm:pt-8 short:pb-1.5 short:pt-5">
         <div className="txt absolute left-3 top-1 text-xs text-white/70">
           {view.handNumber > 0 ? (view.phase === 'betting' ? STREET_NAME[view.street] : 'Final board') : ''}
         </div>
@@ -342,7 +375,7 @@ export function ResultBanner({ view }: { view: GameState }) {
             {lines.map((l, i) => (
               <div key={i} className="txt whitespace-nowrap leading-tight">
                 <div className="text-lg font-bold sm:text-2xl">
-                  {l.who} <ChipIcon className="w-4 align-middle" /> <span className="text-gold">{l.amount.toLocaleString()}</span>
+                  {l.who} <ChipIcon className="w-4 align-middle" /> <span className="text-gold">{fmtChips(l.amount)}</span>
                 </div>
                 {l.desc && <div className="text-sm text-white/85 sm:text-base">{l.desc}</div>}
               </div>
@@ -363,7 +396,7 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
   const badge = view.button === HUMAN_SEAT ? 'D' : sb === HUMAN_SEAT ? 'SB' : bb === HUMAN_SEAT ? 'BB' : null;
   return (
     <div className="flex items-end justify-center">
-      <div className={`relative flex ${me.folded ? 'opacity-50 grayscale' : ''}`}>
+      <div data-tour="hand" className={`relative flex ${me.folded ? 'opacity-50 grayscale' : ''}`}>
         {me.holeCards.map((c, k) => (
           <div key={`${view.handNumber}-${c}`} className={k ? '-ml-3' : ''}>
             <PlayingCard
@@ -383,7 +416,11 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
       {/* Your status, beside the cards */}
       <div className="relative">
       <div className="absolute bottom-[calc(var(--hand-w)*0.75)] left-1 flex max-w-[25vw] flex-col items-start gap-1">
-        {badge && <SeatBadge badge={badge} className="h-6 min-w-6 text-xs" />}
+        {badge && (
+          <span data-tour="button">
+            <SeatBadge badge={badge} className="h-6 min-w-6 text-xs" />
+          </span>
+        )}
         <AnimatePresence mode="popLayout">
           {o.result && net !== 0 ? (
             <NetPill key="net" net={net} big delay={o.runoutDelay + 1.2} withSound bigBlind={view.config.bigBlind} uncontested={!!o.result?.uncontested} />

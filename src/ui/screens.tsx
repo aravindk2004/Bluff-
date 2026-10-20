@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionBar } from './ActionBar';
 import { musicEnabled, setMusicEnabled } from './audio/music';
 import { type Mood } from './Background';
-import { BOTS } from './bots';
+import { BOTS, HIGH_ROLLERS } from './bots';
 import { feedLines, lastActionLabels } from './derive';
 import { HandRankings } from './HandRankings';
 import { Hud, HudStrip } from './Hud';
@@ -12,21 +12,24 @@ import { DEFAULT_SETTINGS, HUMAN_SEAT, type Settings, useGame } from './store';
 import { CoachPanel } from './school/CoachPanel';
 import { Replay } from './school/Replay';
 import { WheelsStrip } from './school/TrainingWheels';
+import { TutorialGuide } from './school/TutorialGuide';
 import { Board, MyHand, Opponents, ResultBanner } from './Table';
-import { Portrait } from './widgets';
+import { fmtChips, Portrait } from './widgets';
 
 export const GAME_TITLE = 'Bluff';
 
 export function useMood(): Mood {
   const screen = useGame((s) => s.screen);
   const view = useGame((s) => s.view);
+  const mode = useGame((s) => s.mode);
   if (screen === 'menu' || !view) return 'menu';
+  const calm = mode === 'highStakes' ? 'vip' : 'calm';
   if (view.phase !== 'betting' && view.result) {
     const net = view.result.netBySeat[HUMAN_SEAT];
-    return net > 0 ? 'win' : net < 0 && view.seats[HUMAN_SEAT].stack === 0 ? 'lose' : 'calm';
+    return net > 0 ? 'win' : net < 0 && view.seats[HUMAN_SEAT].stack === 0 ? 'lose' : calm;
   }
   const live = view.seats.filter((p) => !p.out && !p.folded);
-  return live.some((p) => p.allIn) ? 'tense' : 'calm';
+  return live.some((p) => p.allIn) ? 'tense' : calm;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +62,8 @@ export function Menu() {
   const startGame = useGame((s) => s.startGame);
   const showRankings = useGame((s) => s.showRankings);
   const setShowRankings = useGame((s) => s.setShowRankings);
-  const [setup, setSetup] = useState(false);
+  const [setup, setSetup] = useState<false | 'classic' | 'highStakes'>(false);
+  const [highOpponents, setHighOpponents] = useState(5);
   const [settings, setSettings] = useState<Settings>(useGame.getState().settings ?? DEFAULT_SETTINGS);
   const update = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
 
@@ -86,25 +90,39 @@ export function Menu() {
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
-            className="ppanel grid w-full max-w-2xl grid-cols-2 gap-2 p-2.5 sm:grid-cols-[1.4fr_1fr_1fr_1fr]"
+            className="ppanel grid w-full max-w-2xl grid-cols-2 gap-2 p-2.5 sm:grid-cols-6"
           >
-            <button className="pbtn pbtn-blue col-span-2 py-4 text-4xl sm:col-span-1" onClick={() => setSetup(true)}>
+            <button className="pbtn pbtn-blue py-4 text-4xl sm:col-span-3" onClick={() => setSetup('classic')}>
               PLAY
             </button>
-            <button className="pbtn pbtn-orange text-xl leading-tight" onClick={() => setShowRankings(true)}>
+            <button
+              className="pbtn pbtn-gold flex flex-col items-center justify-center py-2 text-2xl leading-none sm:col-span-3"
+              onClick={() => setSetup('highStakes')}
+            >
+              HIGH STAKES
+              <span className="mt-1 text-xs">$1,000,000 buy-in</span>
+            </button>
+            <button className="pbtn pbtn-orange text-xl leading-tight sm:col-span-2" onClick={() => setShowRankings(true)}>
               HAND
               <br />
               RANKS
             </button>
-            <button className="pbtn pbtn-green text-xl leading-tight" onClick={() => useGame.getState().go('school')}>
+            <button className="pbtn pbtn-green text-xl leading-tight sm:col-span-2" onClick={() => useGame.getState().go('school')}>
               SCHOOL
               <div className="text-xs font-normal">learn &amp; drill</div>
             </button>
-            <button className="pbtn pbtn-purple col-span-2 text-xl leading-tight sm:col-span-1" disabled>
+            <button className="pbtn pbtn-purple col-span-2 text-xl leading-tight sm:col-span-2" disabled>
               ARCADE
               <div className="text-xs font-normal">soon</div>
             </button>
           </motion.div>
+        ) : setup === 'highStakes' ? (
+          <HighStakesSetup
+            opponents={highOpponents}
+            setOpponents={setHighOpponents}
+            onBack={() => setSetup(false)}
+            onSit={() => startGame({ ...settings, opponents: highOpponents }, 'highStakes')}
+          />
         ) : (
           <motion.div
             key="setup"
@@ -136,7 +154,7 @@ export function Menu() {
               </div>
             </Field>
             <Field label="Starting chips" className="mt-3">
-              <Segmented options={[500, 1000, 2000]} value={settings.startingStack} onChange={(v) => update({ startingStack: v })} format={(v) => `$${v.toLocaleString()}`} />
+              <Segmented options={[500, 1000, 2000]} value={settings.startingStack} onChange={(v) => update({ startingStack: v })} format={(v) => `$${fmtChips(v)}`} />
             </Field>
             <Field label="Blinds">
               <Segmented options={[10, 20, 50]} value={settings.bigBlind} onChange={(v) => update({ bigBlind: v })} format={(v) => `${v / 2}/${v}`} />
@@ -155,6 +173,57 @@ export function Menu() {
       <SoundToggles />
       <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
     </div>
+  );
+}
+
+/** The Penthouse: High Stakes table setup with the parody high-roller cast. */
+function HighStakesSetup({ opponents, setOpponents, onBack, onSit }: { opponents: number; setOpponents: (n: number) => void; onBack: () => void; onSit: () => void }) {
+  return (
+    <motion.div
+      key="highstakes"
+      initial={{ y: 40, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 40, opacity: 0 }}
+      className="ppanel flex w-full max-w-xl flex-col gap-3 p-3 short:p-2"
+      style={{ ['--rim' as string]: '#c9a227', background: '#2c2433' }}
+    >
+      <div className="rounded-lg bg-gold py-1.5 text-center text-ink" style={{ boxShadow: '0 4px 0 #b88a12' }}>
+        <div className="text-3xl leading-none short:text-2xl">The Penthouse</div>
+        <div className="text-sm">Buy-in $1,000,000 · Blinds $5k / $10k · play money only</div>
+      </div>
+      <p className="pinset txt px-2 py-1.5 text-center text-sm text-white/85">
+        The richest (and loudest) players in town. A random lineup of these parody high rollers joins you each time.
+      </p>
+      <div className="grid grid-cols-4 gap-2 short:grid-cols-8">
+        {HIGH_ROLLERS.map((b, i) => (
+          <motion.div
+            key={b.id}
+            initial={{ scale: 0, rotate: -15 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: i * 0.05, type: 'spring', stiffness: 400, damping: 14 }}
+            className="flex flex-col items-center gap-0.5 text-center"
+            title={b.tagline}
+          >
+            <div className="rounded-md p-0.5" style={{ background: b.color, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.25), 0 3px 0 rgba(0,0,0,0.3)' }}>
+              <Portrait spec={b.portrait} className="h-11 w-11 short:h-9 short:w-9" />
+            </div>
+            <div className="txt text-xs leading-tight">{b.name}</div>
+            <div className="text-[10px] leading-tight text-white/60 short:hidden">{b.tagline}</div>
+          </motion.div>
+        ))}
+      </div>
+      <Field label="High rollers at your table">
+        <Segmented options={[3, 4, 5, 6]} value={opponents} onChange={setOpponents} />
+      </Field>
+      <div className="grid grid-cols-[1fr_2fr] gap-2">
+        <button className="pbtn pbtn-slate text-lg" onClick={onBack}>
+          Back
+        </button>
+        <button className="pbtn pbtn-gold py-3 text-2xl" onClick={onSit}>
+          Take a seat
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -214,6 +283,7 @@ export function TableScreen() {
   const toggleLog = useGame((s) => s.toggleLog);
   const shake = useGame((s) => s.shake);
   const coachOpen = useGame((s) => s.showCoach && !!s.report);
+  const tutorial = useGame((s) => s.mode === 'tutorial');
   const controls = useAnimationControls();
   const myLabel = useMemo(() => lastActionLabels(view)[HUMAN_SEAT], [view]);
 
@@ -261,13 +331,16 @@ export function TableScreen() {
             <MyHand view={view} label={myLabel} />
           </div>
         </div>
-        <ActionBar view={view} />
+        <div data-tour="actions">
+          <ActionBar view={view} />
+        </div>
         <AnimatePresence>{showLog && <ActionFeed onClose={toggleLog} />}</AnimatePresence>
       </main>
 
       <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
       <CoachPanel />
       <Replay />
+      {tutorial && <TutorialGuide />}
       <GameOver />
     </motion.div>
   );
@@ -308,6 +381,7 @@ function GameOver() {
   const view = useGame((s) => s.view);
   const handsPlayed = useGame((s) => s.handsPlayed);
   const settings = useGame((s) => s.settings);
+  const mode = useGame((s) => s.mode);
   const startGame = useGame((s) => s.startGame);
   const quit = useGame((s) => s.quitToMenu);
   if (!view) return null;
@@ -337,14 +411,14 @@ function GameOver() {
               </div>
               <div className="ppanel p-1">
                 <div className="txt text-xs text-white/70">Final stack</div>
-                <div className="pinset txt text-2xl font-bold text-gold">${me.stack.toLocaleString()}</div>
+                <div className="pinset txt text-2xl font-bold text-gold">${fmtChips(me.stack)}</div>
               </div>
             </div>
             <div className="mt-1 grid grid-cols-2 gap-2">
               <button className="pbtn pbtn-orange text-xl" onClick={quit}>
                 Menu
               </button>
-              <button className="pbtn pbtn-blue text-xl" onClick={() => startGame(settings)}>
+              <button className="pbtn pbtn-blue text-xl" onClick={() => startGame(settings, mode === 'tutorial' ? 'classic' : mode)}>
                 New run
               </button>
             </div>

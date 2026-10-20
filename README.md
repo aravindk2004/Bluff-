@@ -65,3 +65,14 @@ chips to the first winner left of the button, busted players skipped by the butt
   decisions and the option to see cards that were shown at showdown.
 - **Tutorial** (about 5 minutes) and four **2-minute drills** (pot odds, outs, position,
   showdown), with XP, levels and badges saved in the browser.
+
+## Tutorial game and High Stakes
+
+- **Tutorial game** (School → "Start here: the tutorial game"): three rigged hands at the real
+  table. Professor Pip spotlights each part of the screen and only lets you make the move the
+  lesson asks for. The script is pure data (`src/ui/school/tutorialScript.ts`) and a test plays
+  it against the real engine, so the scripted opponents can never get out of step.
+- **High Stakes**: $1,000,000 buy-in, $5k/$10k blinds, a gold "Penthouse" theme and a cast of
+  parody high rollers with their own portraits, play styles and banter. They are affectionate
+  spoofs (fictional characters with pun names), not the real people, and none of their lines
+  are things anyone actually said.

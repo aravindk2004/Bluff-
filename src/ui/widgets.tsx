@@ -1,7 +1,7 @@
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
 import { blindSeats, type GameState } from '../engine';
-import { BOTS, HUMAN_PROFILE } from './bots';
+import { ALL_CHARACTERS, HUMAN_PROFILE } from './bots';
 import { Sprite } from './pixel/Sprite';
 import { buildPortrait, type PortraitSpec } from './pixel/sprites';
 
@@ -11,11 +11,26 @@ export function ChipIcon({ color = '#f0503f', className = 'w-4' }: { color?: str
   return <Sprite grid={CHIP} palette={{ X: color, w: '#f6f1e7' }} className={`inline-block shrink-0 ${className}`} />;
 }
 
+const trimZeros = (s: string) => (s.includes('.') ? s.replace(/\.?0+$/, '') : s);
+
+/**
+ * Chip amounts, shortened when large: 12,500 → "12.5k", 1,250,000 → "1.25M".
+ * `short` also abbreviates round thousands (5,000 → "5k"), for labels like the blinds.
+ */
+export function fmtChips(n: number, short = false): string {
+  const a = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (a >= 1e6) return `${sign}${trimZeros((a / 1e6).toFixed(a >= 1e7 ? 1 : 2))}M`;
+  if (a >= 1e5) return `${sign}${Math.round(a / 1e3)}k`;
+  if (a >= 1e4 || (short && a >= 1000 && a % 100 === 0)) return `${sign}${trimZeros((a / 1e3).toFixed(1))}k`;
+  return n.toLocaleString();
+}
+
 /** A number that counts toward its new value and pops when it changes. */
 export function AnimatedNumber({ value, className }: { value: number; className?: string }) {
   const mv = useMotionValue(value);
   const scale = useMotionValue(1);
-  const text = useTransform(mv, (v) => Math.round(v).toLocaleString());
+  const text = useTransform(mv, (v) => fmtChips(Math.round(v)));
   useEffect(() => {
     if (mv.get() === value) return;
     const a = animate(mv, value, { duration: 0.45, ease: 'easeOut' });
@@ -34,7 +49,7 @@ export const Portrait = memo(function Portrait({ spec, className }: { spec: Port
 });
 
 export function profileFor(id: string) {
-  const bot = BOTS.find((b) => b.id === id);
+  const bot = ALL_CHARACTERS.find((b) => b.id === id);
   return bot ? { color: bot.color, portrait: bot.portrait, tagline: bot.tagline } : { ...HUMAN_PROFILE, tagline: '' };
 }
 

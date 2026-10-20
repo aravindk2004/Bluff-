@@ -5,7 +5,7 @@ import { type Action, collectedPot, type GameState, type LegalActions } from '..
 import { useProgress } from './progress';
 import { buildDecision, HUMAN_SEAT, useGame } from './store';
 import { useOutcome } from './Table';
-import { ChipIcon } from './widgets';
+import { ChipIcon, fmtChips } from './widgets';
 
 /** True while a CSS media query matches (updates on resize/rotation). */
 function useMediaQuery(query: string): boolean {
@@ -26,9 +26,10 @@ export function ActionBar({ view }: { view: GameState }) {
   const handRunning = useGame((s) => s.handRunning);
   const nextHand = useGame((s) => s.nextHand);
   const gameOver = useGame((s) => s.gameOver);
+  const tutorial = useGame((s) => s.mode === 'tutorial');
 
   if (legal) return <Decision view={view} legal={legal} onAct={act} />;
-  if (!handRunning && !gameOver) return <NextHand onClick={nextHand} view={view} />;
+  if (!handRunning && !gameOver && !tutorial) return <NextHand onClick={() => nextHand()} view={view} />;
 
   const actor = view.toAct !== null ? view.seats[view.toAct] : null;
   const text =
@@ -137,7 +138,7 @@ function BigButton({
 
 function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions; onAct: (a: Action) => void }) {
   const me = view.seats[HUMAN_SEAT];
-  const nudgesOn = useProgress((s) => s.settings.nudges);
+  const nudgesOn = useProgress((s) => s.settings.nudges) && useGame.getState().mode !== 'tutorial';
   const [nudge, setNudge] = useState<{ action: Action; title: string; text: string } | null>(null);
   const range = legal.bet ?? legal.raise;
   // On phones the bet sizing panel stays tucked away until you tap Bet/Raise, saving space.
@@ -239,7 +240,7 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
             'C · free'
           ) : (
             <>
-              <ChipIcon className="w-3" /> {legal.call?.toLocaleString()}
+              <ChipIcon className="w-3" /> {legal.call !== null ? fmtChips(legal.call) : ''}
             </>
           )
         }
@@ -310,7 +311,7 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
           ) : range ? (
             <>
               {isBet || isAllIn ? '' : 'to '}
-              <ChipIcon className="w-3" /> {amount.toLocaleString()}
+              <ChipIcon className="w-3" /> {fmtChips(amount)}
             </>
           ) : (
             '—'

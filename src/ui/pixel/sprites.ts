@@ -127,7 +127,7 @@ export interface PortraitSpec {
   skin: string;
   hair: string;
   accent: string;
-  hairStyle: 'short' | 'long' | 'bun' | 'curly' | 'mohawk' | 'bald' | 'slick';
+  hairStyle: 'short' | 'long' | 'bun' | 'curly' | 'mohawk' | 'bald' | 'slick' | 'spiky' | 'bangs' | 'big';
   eyes: 'dots' | 'glasses' | 'shades' | 'sleepy';
   mouth: 'smile' | 'flat' | 'smirk' | 'grin';
   extra?: ('beard' | 'cap' | 'earring' | 'bow' | 'freckles')[];
@@ -196,6 +196,31 @@ export function buildPortrait(spec: PortraitSpec): { grid: Grid; palette: Record
     case 'bald':
       set(4, 2, 'w');
       set(5, 2, 'w');
+      break;
+    case 'spiky':
+      hairTop(2);
+      for (const x of [3, 5, 7, 9, 11]) set(x, 0, 'h');
+      for (let x = 2; x < 12; x++) set(x, 1, 'h');
+      break;
+    case 'bangs':
+      hairTop(3);
+      for (let x = 3; x < 11; x++) set(x, 4, 'h');
+      for (let y = 4; y < 11; y++) {
+        set(1, y, 'h');
+        set(2, y, 'h');
+        set(11, y, 'h');
+        set(12, y, 'h');
+      }
+      break;
+    case 'big':
+      // Voluminous curls framing the face.
+      hairTop(3);
+      for (let y = 0; y < 11; y++)
+        for (let x = 0; x < N; x++) {
+          const dx = (x - 6.5) / 6.8;
+          const dy = (y - 5) / 6;
+          if (dx * dx + dy * dy <= 1 && g[y][x] !== 's') set(x, y, 'h');
+        }
       break;
   }
 

@@ -1,4 +1,5 @@
 import { describeHand, rankName, rankOf, suitOf, type GameState, type HandEvent, type Street } from '../engine';
+import { fmtChips } from './widgets';
 
 /** Short label of each seat's latest action on the current street (or "Fold"). */
 export function lastActionLabels(s: GameState): (string | null)[] {
@@ -22,9 +23,9 @@ export function actionLabel(e: Extract<HandEvent, { kind: 'action' }>): string {
     case 'call':
       return 'Call';
     case 'bet':
-      return `Bet ${e.total}`;
+      return `Bet ${fmtChips(e.total)}`;
     case 'raise':
-      return `Raise to ${e.total}`;
+      return `Raise to ${fmtChips(e.total)}`;
     default:
       return e.action;
   }
@@ -42,16 +43,16 @@ export function feedLines(s: GameState, fromLogIndex = 0): { key: string; text: 
         lines.push({ key, text: `— Hand #${e.handNumber} —`, tone: 'muted' });
         break;
       case 'blind':
-        lines.push({ key, text: `${name(e.seat)} post${e.seat === 0 ? '' : 's'} ${e.blind} blind ${e.amount}`, tone: 'muted' });
+        lines.push({ key, text: `${name(e.seat)} post${e.seat === 0 ? '' : 's'} ${e.blind} blind ${fmtChips(e.amount)}`, tone: 'muted' });
         break;
       case 'action':
-        lines.push({ key, text: `${name(e.seat)}: ${e.action === 'call' && !e.allIn ? `Call ${e.amount}` : actionLabel(e)}`, tone: 'normal' });
+        lines.push({ key, text: `${name(e.seat)}: ${e.action === 'call' && !e.allIn ? `Call ${fmtChips(e.amount)}` : actionLabel(e)}`, tone: 'normal' });
         break;
       case 'street':
         lines.push({ key, text: `${STREET_NAME[e.street]}: ${e.cards.join(' ')}`, tone: 'muted' });
         break;
       case 'refund':
-        lines.push({ key, text: `${e.amount} uncalled returned to ${name(e.seat)}`, tone: 'muted' });
+        lines.push({ key, text: `${fmtChips(e.amount)} uncalled returned to ${name(e.seat)}`, tone: 'muted' });
         break;
       case 'show':
         lines.push({ key, text: `${name(e.seat)} show${e.seat === 0 ? '' : 's'} ${e.cards.join(' ')} (${e.description})`, tone: 'normal' });
@@ -59,7 +60,7 @@ export function feedLines(s: GameState, fromLogIndex = 0): { key: string; text: 
       case 'win':
         lines.push({
           key,
-          text: `${name(e.seat)} win${e.seat === 0 ? '' : 's'} ${e.amount}${e.description ? ` with ${e.description}` : ''}`,
+          text: `${name(e.seat)} win${e.seat === 0 ? '' : 's'} ${fmtChips(e.amount)}${e.description ? ` with ${e.description}` : ''}`,
           tone: 'gold',
         });
         break;

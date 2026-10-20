@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { TIER_TEXT } from '../../coach/ranges';
 import type { GameState } from '../../engine';
 import { useProgress } from '../progress';
-import { HUMAN_SEAT } from '../store';
+import { HUMAN_SEAT, useGame } from '../store';
 import { type LiveOdds, useLiveOdds } from '../useLiveOdds';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -34,13 +34,14 @@ export function WheelsToggle({ className = '' }: { className?: string }) {
 
 /** Full panel for the desktop sidebar. */
 export function WheelsPanel({ view }: { view: GameState }) {
-  const on = useProgress((s) => s.settings.trainingWheels);
+  const tutorial = useGame((s) => s.mode === 'tutorial');
+  const on = useProgress((s) => s.settings.trainingWheels) || tutorial;
   const odds = useLiveOdds(on ? view : null, HUMAN_SEAT);
   const v = odds && view.phase === 'betting' ? verdict(odds) : null;
 
   return (
-    <div className="ppanel flex flex-col gap-1.5 p-2">
-      <WheelsToggle />
+    <div className="ppanel flex flex-col gap-1.5 p-2" data-tour="wheels">
+      {!tutorial && <WheelsToggle />}
       {!on ? null : !odds ? (
         <div className="pinset txt px-2 py-1.5 text-center text-sm text-white/60">
           {view.seats[HUMAN_SEAT].folded ? 'You folded this hand.' : 'Waiting for cards…'}
@@ -86,12 +87,14 @@ export function WheelsPanel({ view }: { view: GameState }) {
 
 /** One-line version for phones, sitting above your cards. */
 export function WheelsStrip({ view }: { view: GameState }) {
-  const on = useProgress((s) => s.settings.trainingWheels);
+  const tutorial = useGame((s) => s.mode === 'tutorial');
+  const on = useProgress((s) => s.settings.trainingWheels) || tutorial;
   const odds = useLiveOdds(on ? view : null, HUMAN_SEAT);
   if (!on || !odds) return null;
   const v = view.phase === 'betting' ? verdict(odds) : null;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1 text-sm cramped:flex-nowrap cramped:justify-start cramped:overflow-x-auto cramped:whitespace-nowrap cramped:text-xs">
+    <div data-tour="wheels handinfo" className="flex flex-wrap items-center justify-center gap-1 text-sm cramped:flex-nowrap cramped:justify-start cramped:overflow-x-auto cramped:whitespace-nowrap cramped:text-xs">
+      {view.street !== 'preflop' && <span className="txt rounded-md bg-blue px-1.5">{odds.handName}</span>}
       <span className="txt rounded-md bg-slate-deep px-1.5">
         Win <span className="text-gold">{pct(odds.equity)}</span>
       </span>
