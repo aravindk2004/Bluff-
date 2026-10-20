@@ -1,7 +1,9 @@
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { nudgeFor } from '../coach/analyze';
 import { type Action, collectedPot, type GameState, type LegalActions } from '../engine';
-import { HUMAN_SEAT, useGame } from './store';
+import { useProgress } from './progress';
+import { buildDecision, HUMAN_SEAT, useGame } from './store';
 import { useOutcome } from './Table';
 import { ChipIcon } from './widgets';
 
@@ -42,6 +44,9 @@ function Dots() {
 
 function NextHand({ onClick, view }: { onClick: () => void; view: GameState }) {
   const o = useOutcome(view);
+  const report = useGame((s) => s.report);
+  const setShowCoach = useGame((s) => s.setShowCoach);
+  const setShowReplay = useGame((s) => s.setShowReplay);
   // Appear once the result has landed, not before.
   const delay = o.result ? o.runoutDelay + (o.result.uncontested ? 0.5 : 1.9) : 0.3;
   useEffect(() => {
@@ -55,7 +60,17 @@ function NextHand({ onClick, view }: { onClick: () => void; view: GameState }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClick]);
   return (
-    <div className="mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center">
+    <div className="mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center gap-2">
+      {report && (
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay }} className="flex flex-col gap-1">
+          <button className="pbtn pbtn-purple px-3 py-1 text-base" onClick={() => setShowCoach(true)}>
+            Coach
+          </button>
+          <button className="pbtn pbtn-orange px-3 py-1 text-base" onClick={() => setShowReplay(true)}>
+            Replay
+          </button>
+        </motion.div>
+      )}
       <motion.button
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -97,6 +112,8 @@ function BigButton({
 
 function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions; onAct: (a: Action) => void }) {
   const me = view.seats[HUMAN_SEAT];
+  const nudgesOn = useProgress((s) => s.settings.nudges);
+  const [nudge, setNudge] = useState<{ action: Action; title: string; text: string } | null>(null);
   const range = legal.bet ?? legal.raise;
   const isBet = !!legal.bet;
   const pot = collectedPot(view) + view.seats.reduce((s, p) => s + p.bet, 0);
@@ -115,17 +132,31 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
     return Math.max(range.min, Math.min(range.max, Math.round(target)));
   };
 
+  // Before a clearly costly move, ask once (if nudges are on).
+  const tryAct = (action: Action) => {
+    if (nudgesOn && !nudge) {
+      const rec = buildDecision(view, legal, action);
+      const n = rec && nudgeFor(rec);
+      if (n) {
+        setNudge({ action, ...n });
+        return;
+      }
+    }
+    setNudge(null);
+    onAct(action);
+  };
   const submitAggro = () => {
     if (!range) return;
-    onAct(isAllIn ? { type: 'allIn' } : { type: isBet ? 'bet' : 'raise', amount });
+    tryAct(isAllIn ? { type: 'allIn' } : { type: isBet ? 'bet' : 'raise', amount });
   };
-  const passive = () => onAct(legal.check ? { type: 'check' } : { type: 'call' });
+  const passive = () => tryAct(legal.check ? { type: 'check' } : { type: 'call' });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement && e.target.type !== 'range') return;
       const k = e.key.toLowerCase();
-      if (k === 'f' && legal.fold) onAct({ type: 'fold' });
+      if (nudge) return;
+      if (k === 'f' && legal.fold) tryAct({ type: 'fold' });
       else if (k === 'c' || k === 'k') passive();
       else if ((k === 'r' || k === 'b') && range) submitAggro();
     };
@@ -140,9 +171,33 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-      className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-2 sm:grid-cols-[1fr_1fr_1.6fr_1fr]"
+      className="relative mx-auto grid w-full max-w-3xl grid-cols-3 gap-2 sm:grid-cols-[1fr_1fr_1.6fr_1fr]"
     >
-      <BigButton color="red" label="Fold" sub="F" disabled={!legal.fold} onClick={() => onAct({ type: 'fold' })} />
+      <AnimatePresence>
+        {nudge && (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="ppanel absolute inset-x-0 bottom-[calc(100%+0.5rem)] z-50 mx-auto flex max-w-md flex-col gap-2 p-2.5"
+            style={{ boxShadow: 'inset 0 0 0 2px #ffcc3d, 0 4px 0 rgba(0,0,0,0.4)' }}
+            role="alertdialog"
+            aria-label={nudge.title}
+          >
+            <div className="txt text-xl text-gold">Hold on: {nudge.title}</div>
+            <p className="text-sm leading-snug text-white/90">{nudge.text}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className="pbtn pbtn-blue text-lg" onClick={() => setNudge(null)} autoFocus>
+                Rethink
+              </button>
+              <button className="pbtn pbtn-slate text-lg" onClick={() => { const a = nudge.action; setNudge(null); onAct(a); }}>
+                Do it anyway
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <BigButton color="red" label="Fold" sub="F" disabled={!legal.fold} onClick={() => tryAct({ type: 'fold' })} />
       <BigButton
         color="blue"
         label={legal.check ? 'Check' : callAllIn ? 'Call all-in' : 'Call'}

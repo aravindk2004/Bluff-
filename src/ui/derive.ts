@@ -31,10 +31,11 @@ export function actionLabel(e: Extract<HandEvent, { kind: 'action' }>): string {
 }
 
 /** Human-readable feed lines for the action log. */
-export function feedLines(s: GameState): { key: string; text: string; tone: 'muted' | 'normal' | 'gold' }[] {
+export function feedLines(s: GameState, fromLogIndex = 0): { key: string; text: string; tone: 'muted' | 'normal' | 'gold' }[] {
   const name = (i: number) => (i === 0 ? 'You' : s.seats[i].name);
   const lines: { key: string; text: string; tone: 'muted' | 'normal' | 'gold' }[] = [];
   s.log.forEach((e, idx) => {
+    if (idx < fromLogIndex) return;
     const key = `${s.handNumber}-${idx}`;
     switch (e.kind) {
       case 'handStart':

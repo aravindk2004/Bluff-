@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { collectedPot, type GameState } from '../engine';
 import { currentHandName, STREET_NAME } from './derive';
+import { WheelsPanel } from './school/TrainingWheels';
 import { HUMAN_SEAT, useGame } from './store';
 import { AnimatedNumber, ChipIcon, positionName, StatTile } from './widgets';
 
@@ -117,6 +118,8 @@ export function Hud({ view }: { view: GameState }) {
           )}
         </div>
       </div>
+
+      <WheelsPanel view={view} />
 
       {/* Buttons + stats */}
       <div className="grid grid-cols-[1fr_2fr] gap-2">

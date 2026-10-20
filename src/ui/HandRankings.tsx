@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { parseCards } from '../engine';
 import { PlayingCard } from './PlayingCard';
 
-const RANKINGS: { name: string; cards: string; blurb: string }[] = [
+export const RANKINGS: { name: string; cards: string; blurb: string }[] = [
   { name: 'Royal Flush', cards: 'As Ks Qs Js Ts', blurb: 'A-K-Q-J-10, all the same suit. The best hand there is.' },
   { name: 'Straight Flush', cards: '9h 8h 7h 6h 5h', blurb: 'Five cards in a row, all the same suit.' },
   { name: 'Four of a Kind', cards: '7c 7d 7h 7s Kd', blurb: 'Four cards of the same rank.' },

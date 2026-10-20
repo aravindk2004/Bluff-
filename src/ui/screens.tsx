@@ -8,6 +8,9 @@ import { HandRankings } from './HandRankings';
 import { Hud, HudStrip } from './Hud';
 import { PlayingCard } from './PlayingCard';
 import { DEFAULT_SETTINGS, HUMAN_SEAT, type Settings, useGame } from './store';
+import { CoachPanel } from './school/CoachPanel';
+import { Replay } from './school/Replay';
+import { WheelsStrip } from './school/TrainingWheels';
 import { Board, MyHand, Opponents, ResultBanner } from './Table';
 import { Portrait } from './widgets';
 
@@ -92,9 +95,9 @@ export function Menu() {
               <br />
               RANKS
             </button>
-            <button className="pbtn pbtn-green text-xl leading-tight" disabled>
+            <button className="pbtn pbtn-green text-xl leading-tight" onClick={() => useGame.getState().go('school')}>
               SCHOOL
-              <div className="text-xs font-normal">soon</div>
+              <div className="text-xs font-normal">learn &amp; drill</div>
             </button>
             <button className="pbtn pbtn-purple col-span-2 text-xl leading-tight sm:col-span-1" disabled>
               ARCADE
@@ -184,6 +187,7 @@ export function TableScreen() {
   const showLog = useGame((s) => s.showLog);
   const toggleLog = useGame((s) => s.toggleLog);
   const shake = useGame((s) => s.shake);
+  const coachOpen = useGame((s) => s.showCoach && !!s.report);
   const controls = useAnimationControls();
   const myLabel = useMemo(() => lastActionLabels(view)[HUMAN_SEAT], [view]);
 
@@ -210,7 +214,9 @@ export function TableScreen() {
         <HudStrip view={view} />
       </div>
 
-      <main className="relative flex min-h-0 flex-col gap-2 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-4 sm:px-4 sm:pt-6">
+      <main
+        className={`relative flex min-h-0 flex-col gap-2 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-4 transition-[padding] duration-300 sm:px-4 sm:pt-6 ${coachOpen ? 'xl:pr-[23.5rem]' : ''}`}
+      >
         <Opponents view={view} />
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
           <Board view={view} />
@@ -219,12 +225,17 @@ export function TableScreen() {
             <ResultBanner view={view} />
           </div>
         </div>
+        <div className="lg:hidden">
+          <WheelsStrip view={view} />
+        </div>
         <MyHand view={view} label={myLabel} />
         <ActionBar view={view} />
         <AnimatePresence>{showLog && <ActionFeed onClose={toggleLog} />}</AnimatePresence>
       </main>
 
       <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
+      <CoachPanel />
+      <Replay />
       <GameOver />
     </motion.div>
   );
