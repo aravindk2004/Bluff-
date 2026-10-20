@@ -1,35 +1,9 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { collectedPot, type GameState, type LegalActions } from '../engine';
-import { currentHandName } from './derive';
-import { PlayingCard } from './PlayingCard';
+import { type Action, collectedPot, type GameState, type LegalActions } from '../engine';
 import { HUMAN_SEAT, useGame } from './store';
-
-export function HandArea({ view }: { view: GameState }) {
-  const me = view.seats[HUMAN_SEAT];
-  const name = currentHandName(view, HUMAN_SEAT);
-  const result = view.phase !== 'betting' ? view.result : null;
-  const winners = new Set(result?.awards.flatMap((a) => a.winners) ?? []);
-  const best = new Set(result?.shown.filter((h) => winners.has(h.seat)).flatMap((h) => h.bestFive) ?? []);
-  if (me.out || me.holeCards.length !== 2) return <div className="h-24 sm:h-32" />;
-  return (
-    <div className="flex items-end justify-center gap-3">
-      <div className={`flex gap-1.5 ${me.folded ? 'opacity-40 grayscale' : ''}`}>
-        {me.holeCards.map((c, k) => (
-          <motion.div key={`${view.handNumber}-${c}`} whileHover={{ y: -6, rotate: k ? 3 : -3 }}>
-            <PlayingCard card={c} size="lg" delay={0.15 + k * 0.12} highlight={best.has(c)} />
-          </motion.div>
-        ))}
-      </div>
-      {name && (
-        <div className="mb-2 max-w-[9rem] rounded-xl border-2 border-ink bg-plum px-2 py-1 font-display text-sm leading-tight text-cream shadow-chunky-sm sm:max-w-none sm:text-base">
-          <div className="text-[10px] uppercase tracking-widest text-cream/50 sm:text-xs">{me.folded ? 'Folded' : 'You have'}</div>
-          {name}
-        </div>
-      )}
-    </div>
-  );
-}
+import { useOutcome } from './Table';
+import { ChipIcon } from './widgets';
 
 export function ActionBar({ view }: { view: GameState }) {
   const legal = useGame((s) => s.legal);
@@ -39,26 +13,40 @@ export function ActionBar({ view }: { view: GameState }) {
   const gameOver = useGame((s) => s.gameOver);
 
   if (legal) return <Decision view={view} legal={legal} onAct={act} />;
+  if (!handRunning && !gameOver) return <NextHand onClick={nextHand} view={view} />;
 
-  if (!handRunning && !gameOver) {
-    return (
-      <div className="flex justify-center">
-        <NextHandButton onClick={nextHand} />
-      </div>
-    );
-  }
   const actor = view.toAct !== null ? view.seats[view.toAct] : null;
+  const text =
+    actor && view.toAct !== HUMAN_SEAT ? `${actor.name} is thinking` : view.seats[HUMAN_SEAT].folded ? 'You folded — watch how it plays out' : 'Dealing';
   return (
-    <div className="flex h-14 items-center justify-center font-display text-cream/60">
-      {actor && view.toAct !== HUMAN_SEAT ? `${actor.name} is thinking…` : view.seats[HUMAN_SEAT].folded ? 'You folded — watch how it plays out' : ''}
+    <div className="ptray mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center">
+      <div className="txt text-lg text-white/75">
+        {text}
+        <Dots />
+      </div>
     </div>
   );
 }
 
-function NextHandButton({ onClick }: { onClick: () => void }) {
+function Dots() {
+  return (
+    <span className="inline-flex w-6">
+      {[0, 1, 2].map((i) => (
+        <motion.span key={i} animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}>
+          .
+        </motion.span>
+      ))}
+    </span>
+  );
+}
+
+function NextHand({ onClick, view }: { onClick: () => void; view: GameState }) {
+  const o = useOutcome(view);
+  // Appear once the result has landed, not before.
+  const delay = o.result ? o.runoutDelay + (o.result.uncontested ? 0.5 : 1.9) : 0.3;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === ' ' || e.key === 'Enter' || e.key === 'n') {
+      if (e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 'n') {
         e.preventDefault();
         onClick();
       }
@@ -67,19 +55,47 @@ function NextHandButton({ onClick }: { onClick: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClick]);
   return (
-    <motion.button
-      initial={{ scale: 0.6, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: 0.6, type: 'spring', stiffness: 300, damping: 15 }}
-      className="btn btn-gold px-8 text-xl"
-      onClick={onClick}
-    >
-      Deal next hand
-    </motion.button>
+    <div className="mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center">
+      <motion.button
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay, type: 'spring', stiffness: 300, damping: 13 }}
+        className="pbtn pbtn-blue flex flex-col items-center px-10 py-2 text-2xl leading-none"
+        onClick={onClick}
+      >
+        Deal next hand
+        <span className="mt-1 text-xs font-normal text-white/75">space</span>
+      </motion.button>
+    </div>
   );
 }
 
-function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions; onAct: ReturnType<typeof useGame.getState>['act'] }) {
+function BigButton({
+  color,
+  label,
+  sub,
+  disabled,
+  onClick,
+}: {
+  color: 'red' | 'blue' | 'orange';
+  label: string;
+  sub: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`pbtn pbtn-${color} flex min-h-[3.75rem] flex-col items-center justify-center px-2 py-1.5 text-lg leading-none sm:text-2xl`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+      <span className="mt-1 flex items-center gap-1 text-xs font-medium text-white/85 sm:text-sm">{sub}</span>
+    </button>
+  );
+}
+
+function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions; onAct: (a: Action) => void }) {
   const me = view.seats[HUMAN_SEAT];
   const range = legal.bet ?? legal.raise;
   const isBet = !!legal.bet;
@@ -90,7 +106,6 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
     setAmount(range?.min ?? 0);
   }, [range?.min, range?.max]);
 
-  const allInAmount = me.bet + me.stack;
   const isAllIn = !!range && amount >= range.max;
 
   // Pot-fraction sizes: bet = fraction of pot; raise = call + fraction of the pot after calling.
@@ -104,93 +119,111 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
     if (!range) return;
     onAct(isAllIn ? { type: 'allIn' } : { type: isBet ? 'bet' : 'raise', amount });
   };
+  const passive = () => onAct(legal.check ? { type: 'check' } : { type: 'call' });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement && e.target.type !== 'range') return;
       const k = e.key.toLowerCase();
       if (k === 'f' && legal.fold) onAct({ type: 'fold' });
-      else if (k === 'c' || k === 'k') onAct(legal.check ? { type: 'check' } : { type: 'call' });
+      else if (k === 'c' || k === 'k') passive();
       else if ((k === 'r' || k === 'b') && range) submitAggro();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const callAllIn = legal.call !== null && legal.call >= me.stack;
+
   return (
     <motion.div
-      initial={{ y: 30, opacity: 0 }}
+      initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="panel mx-auto flex w-full max-w-2xl flex-col gap-2 p-2 sm:p-3"
+      transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+      className="mx-auto grid w-full max-w-3xl grid-cols-3 gap-2 sm:grid-cols-[1fr_1fr_1.6fr_1fr]"
     >
-      {range && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {[
-              ['Min', range.min],
-              ['½ Pot', sizeFor(0.5)],
-              ['¾ Pot', sizeFor(0.75)],
-              ['Pot', sizeFor(1)],
-              ['All-in', range.max],
-            ].map(([label, v]) => (
-              <button
-                key={label as string}
-                className={`btn btn-dark px-2.5 py-1 text-sm ${amount === v ? 'bg-mustard text-ink' : ''}`}
-                onClick={() => setAmount(v as number)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3 px-1">
-            <input
-              type="range"
-              className="slider"
-              min={range.min}
-              max={range.max}
-              step={Math.max(1, Math.round(view.config.bigBlind / 2))}
-              value={amount}
-              onChange={(e) => setAmount(Math.min(range.max, Math.max(range.min, Number(e.target.value))))}
-              aria-label="Bet amount"
-            />
-            <input
-              type="number"
-              className="w-20 rounded-lg border-2 border-ink bg-cream px-2 py-1 text-right font-display text-ink"
-              min={range.min}
-              max={range.max}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              onBlur={() => setAmount((a) => Math.min(range.max, Math.max(range.min, a || range.min)))}
-            />
-          </div>
-        </div>
-      )}
-      <div className="grid grid-cols-3 gap-2">
-        <button className="btn btn-red" disabled={!legal.fold} onClick={() => onAct({ type: 'fold' })}>
-          Fold
-        </button>
-        {legal.check ? (
-          <button className="btn btn-blue" onClick={() => onAct({ type: 'check' })}>
-            Check
-          </button>
+      <BigButton color="red" label="Fold" sub="F" disabled={!legal.fold} onClick={() => onAct({ type: 'fold' })} />
+      <BigButton
+        color="blue"
+        label={legal.check ? 'Check' : callAllIn ? 'Call all-in' : 'Call'}
+        sub={
+          legal.check ? (
+            'C · free'
+          ) : (
+            <>
+              <ChipIcon className="w-3" /> {legal.call?.toLocaleString()}
+            </>
+          )
+        }
+        onClick={passive}
+      />
+
+      {/* Sizing — full width row on phones */}
+      <div className="ppanel order-first col-span-3 flex flex-col gap-1.5 p-1.5 sm:order-none sm:col-span-1">
+        {range ? (
+          <>
+            <div className="grid grid-cols-5 gap-1">
+              {(
+                [
+                  ['Min', range.min],
+                  ['½', sizeFor(0.5)],
+                  ['¾', sizeFor(0.75)],
+                  ['Pot', sizeFor(1)],
+                  ['Max', range.max],
+                ] as const
+              ).map(([label, v]) => (
+                <button
+                  key={label}
+                  className={`pbtn px-0 py-0.5 text-sm ${amount === v ? 'pbtn-gold' : 'pbtn-slate'}`}
+                  onClick={() => setAmount(v)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 px-0.5">
+              <input
+                type="range"
+                className="pslider"
+                min={range.min}
+                max={range.max}
+                step={Math.max(1, Math.round(view.config.bigBlind / 2))}
+                value={amount}
+                onChange={(e) => setAmount(Math.min(range.max, Math.max(range.min, Number(e.target.value))))}
+                aria-label="Bet amount"
+              />
+              <input
+                type="number"
+                className="pinset w-16 px-1 py-0.5 text-right font-pixel font-bold text-gold outline-none"
+                min={range.min}
+                max={range.max}
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                onBlur={() => setAmount((a) => Math.min(range.max, Math.max(range.min, a || range.min)))}
+              />
+            </div>
+          </>
         ) : (
-          <button className="btn btn-blue" disabled={legal.call === null} onClick={() => onAct({ type: 'call' })}>
-            {legal.call !== null && legal.call >= me.stack ? `Call all-in ${legal.call}` : `Call ${legal.call ?? ''}`}
-          </button>
+          <div className="txt flex h-full items-center justify-center text-center text-sm text-white/60">No raise possible</div>
         )}
-        <button className="btn btn-gold" disabled={!range} onClick={submitAggro}>
-          {!range
-            ? isBet
-              ? 'Bet'
-              : 'Raise'
-            : isAllIn
-              ? `All-in ${allInAmount}`
-              : `${isBet ? 'Bet' : 'Raise to'} ${amount}`}
-        </button>
       </div>
-      <div className="hidden text-center text-xs text-cream/40 sm:block">
-        Keys: F fold · C check/call · R bet/raise
-      </div>
+
+      <BigButton
+        color="orange"
+        label={isAllIn ? 'All-in!' : isBet ? 'Bet' : 'Raise'}
+        sub={
+          range ? (
+            <>
+              {isBet || isAllIn ? '' : 'to '}
+              <ChipIcon className="w-3" /> {amount.toLocaleString()}
+            </>
+          ) : (
+            '—'
+          )
+        }
+        disabled={!range}
+        onClick={submitAggro}
+      />
     </motion.div>
   );
 }

@@ -4,22 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#1a1220',
-        plum: { DEFAULT: '#2b1830', deep: '#1c0f20', light: '#4a2a50' },
-        felt: { DEFAULT: '#1d6b55', dark: '#124537', light: '#2a8a6e', rim: '#5a2e1c' },
-        crimson: { DEFAULT: '#e04848', dark: '#a82a35' },
-        mustard: { DEFAULT: '#f5b83d', dark: '#c98a1a' },
-        sky: { DEFAULT: '#3fa7e0', dark: '#1f6e9e' },
-        cream: { DEFAULT: '#fbf1dc', dark: '#e8d7b4' },
+        ink: '#1b1b2a',
+        slate: { DEFAULT: '#3b4b50', dark: '#253236', deep: '#1a2427', edge: '#5d7277' },
+        blue: { DEFAULT: '#2d8ff0', dark: '#1a5ea6' },
+        red: { DEFAULT: '#f0503f', dark: '#a3302a' },
+        orange: { DEFAULT: '#ee7d17', dark: '#a3530a' },
+        gold: { DEFAULT: '#ffcc3d', dark: '#b88a12' },
+        green: { DEFAULT: '#3aa86b', dark: '#22704a' },
+        purple: { DEFAULT: '#8b5cd6', dark: '#5a3698' },
+        paper: { DEFAULT: '#f6f1e7', edge: '#cfc6b5' },
       },
       fontFamily: {
-        display: ['"Lilita One"', 'system-ui', 'sans-serif'],
-        body: ['Rubik', 'system-ui', 'sans-serif'],
-      },
-      boxShadow: {
-        chunky: '0 4px 0 0 rgba(0,0,0,0.45)',
-        'chunky-sm': '0 2px 0 0 rgba(0,0,0,0.45)',
-        card: '0 3px 0 0 #b9a47c, 0 6px 14px rgba(0,0,0,0.45)',
+        pixel: ['"Jersey 10"', 'ui-monospace', 'monospace'],
       },
     },
   },

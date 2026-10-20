@@ -1,120 +1,197 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
-import { ActionBar, HandArea } from './ActionBar';
+import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionBar } from './ActionBar';
+import { type Mood } from './Background';
 import { BOTS } from './bots';
-import { feedLines } from './derive';
+import { feedLines, lastActionLabels } from './derive';
 import { HandRankings } from './HandRankings';
+import { Hud, HudStrip } from './Hud';
 import { PlayingCard } from './PlayingCard';
 import { DEFAULT_SETTINGS, HUMAN_SEAT, type Settings, useGame } from './store';
-import { Table } from './Table';
+import { Board, MyHand, Opponents, ResultBanner } from './Table';
+import { Portrait } from './widgets';
 
 export const GAME_TITLE = 'Bluff';
 
+export function useMood(): Mood {
+  const screen = useGame((s) => s.screen);
+  const view = useGame((s) => s.view);
+  if (screen === 'menu' || !view) return 'menu';
+  if (view.phase !== 'betting' && view.result) {
+    const net = view.result.netBySeat[HUMAN_SEAT];
+    return net > 0 ? 'win' : net < 0 && view.seats[HUMAN_SEAT].stack === 0 ? 'lose' : 'calm';
+  }
+  const live = view.seats.filter((p) => !p.out && !p.folded);
+  return live.some((p) => p.allIn) ? 'tense' : 'calm';
+}
+
+// ---------------------------------------------------------------------------
+// Menu
+
+function WobblyTitle({ text }: { text: string }) {
+  return (
+    <h1 className="flex select-none font-pixel text-[5.5rem] font-bold leading-none sm:text-[9rem]">
+      {text.split('').map((ch, i) => (
+        <motion.span
+          key={i}
+          className="inline-block"
+          style={{ color: '#ffcc3d', textShadow: '0 6px 0 #f0503f, 0 12px 0 rgba(0,0,0,0.35)' }}
+          initial={{ y: -80, opacity: 0, rotate: -20 }}
+          animate={{ y: [0, -8, 0], opacity: 1, rotate: [-3, 3, -3] }}
+          transition={{
+            y: { repeat: Infinity, duration: 2.2, delay: i * 0.15, ease: 'easeInOut' },
+            rotate: { repeat: Infinity, duration: 3, delay: i * 0.2, ease: 'easeInOut' },
+            opacity: { delay: i * 0.08 },
+          }}
+        >
+          {ch}
+        </motion.span>
+      ))}
+    </h1>
+  );
+}
+
 export function Menu() {
   const startGame = useGame((s) => s.startGame);
+  const showRankings = useGame((s) => s.showRankings);
+  const setShowRankings = useGame((s) => s.setShowRankings);
+  const [setup, setSetup] = useState(false);
   const [settings, setSettings] = useState<Settings>(useGame.getState().settings ?? DEFAULT_SETTINGS);
   const update = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-6 p-4">
-      <motion.div
-        initial={{ y: -30, opacity: 0, rotate: -8 }}
-        animate={{ y: 0, opacity: 1, rotate: -3 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 12 }}
-        className="flex flex-col items-center"
-      >
-        <div className="flex gap-1">
-          {(['As', 'Kh'] as const).map((c, i) => (
-            <motion.div key={c} animate={{ rotate: i ? 8 : -8, y: [0, -6, 0] }} transition={{ y: { repeat: Infinity, duration: 2.4, delay: i * 0.3 } }}>
-              <PlayingCard card={c} size="lg" delay={0.2 + i * 0.15} />
-            </motion.div>
+    <div className="flex h-full flex-col items-center justify-center gap-6 overflow-y-auto p-4">
+      <div className="relative flex flex-col items-center">
+        <div className={`pointer-events-none absolute -top-10 flex transition-opacity sm:-top-16 ${setup ? 'opacity-0' : ''}`}>
+          {(['Ks', 'Ah', 'Qd'] as const).map((c, i) => (
+            <div key={c} className={i ? '-ml-6' : ''}>
+              <PlayingCard card={c} width="min(16vw, 92px)" tilt={(i - 1) * 14} delay={0.3 + i * 0.12} from={{ x: 0, y: -200, rotate: 30 }} interactive={false} />
+            </div>
           ))}
         </div>
-        <h1
-          className="mt-3 font-display text-7xl text-mustard sm:text-8xl"
-          style={{ textShadow: '0 6px 0 #a82a35, 0 10px 0 rgba(0,0,0,0.4)' }}
-        >
-          {GAME_TITLE}
-        </h1>
-        <p className="font-display text-lg text-cream/70">No-Limit Hold'em · play money only</p>
-      </motion.div>
-
-      <div className="panel flex w-full max-w-md flex-col gap-4 p-5">
-        <Field label="Opponents">
-          <div className="flex gap-1.5">
-            {[2, 3, 4, 5, 6].map((n) => (
-              <button
-                key={n}
-                className={`btn flex-1 px-0 py-1.5 ${settings.opponents === n ? 'btn-gold' : 'btn-dark'}`}
-                onClick={() => update({ opponents: n })}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {BOTS.slice(0, settings.opponents).map((b) => (
-              <span key={b.id} className="rounded-full border-2 border-ink px-2 font-display text-sm text-ink" style={{ background: b.color }}>
-                {b.glyph} {b.name}
-              </span>
-            ))}
-          </div>
-        </Field>
-        <Field label="Starting chips">
-          <div className="flex gap-1.5">
-            {[500, 1000, 2000].map((n) => (
-              <button
-                key={n}
-                className={`btn flex-1 px-0 py-1.5 ${settings.startingStack === n ? 'btn-gold' : 'btn-dark'}`}
-                onClick={() => update({ startingStack: n })}
-              >
-                {n.toLocaleString()}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Blinds">
-          <div className="flex gap-1.5">
-            {[10, 20, 50].map((bb) => (
-              <button
-                key={bb}
-                className={`btn flex-1 px-0 py-1.5 ${settings.bigBlind === bb ? 'btn-gold' : 'btn-dark'}`}
-                onClick={() => update({ bigBlind: bb })}
-              >
-                {bb / 2}/{bb}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <button className="btn btn-red mt-1 py-3 text-2xl" onClick={() => startGame(settings)}>
-          Sit down
-        </button>
+        <div className={setup ? 'mt-0' : 'mt-24 sm:mt-28'}>
+          <WobblyTitle text={GAME_TITLE.toUpperCase()} />
+        </div>
+        <div className="txt -mt-1 text-lg text-white/85">No-Limit Hold'em · play money only</div>
       </div>
-      <p className="max-w-md text-center text-xs text-cream/40">
-        The School (with coaching) and The Arcade are coming. For now: a straight game of Hold'em.
-      </p>
+
+      <AnimatePresence mode="wait">
+        {!setup ? (
+          <motion.div
+            key="main"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            className="ppanel grid w-full max-w-2xl grid-cols-2 gap-2 p-2.5 sm:grid-cols-[1.4fr_1fr_1fr_1fr]"
+          >
+            <button className="pbtn pbtn-blue col-span-2 py-4 text-4xl sm:col-span-1" onClick={() => setSetup(true)}>
+              PLAY
+            </button>
+            <button className="pbtn pbtn-orange text-xl leading-tight" onClick={() => setShowRankings(true)}>
+              HAND
+              <br />
+              RANKS
+            </button>
+            <button className="pbtn pbtn-green text-xl leading-tight" disabled>
+              SCHOOL
+              <div className="text-xs font-normal">soon</div>
+            </button>
+            <button className="pbtn pbtn-purple col-span-2 text-xl leading-tight sm:col-span-1" disabled>
+              ARCADE
+              <div className="text-xs font-normal">soon</div>
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="setup"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            className="ppanel flex w-full max-w-md flex-col gap-3 p-3"
+          >
+            <div className="txt rounded-lg bg-blue py-1.5 text-center text-2xl font-bold" style={{ boxShadow: '0 4px 0 #1a5ea6' }}>
+              New table
+            </div>
+            <Field label="Opponents">
+              <Segmented options={[2, 3, 4, 5, 6]} value={settings.opponents} onChange={(v) => update({ opponents: v })} />
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                {BOTS.slice(0, settings.opponents).map((b, i) => (
+                  <motion.div
+                    key={b.id}
+                    initial={{ scale: 0, rotate: -20 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: i * 0.05, type: 'spring', stiffness: 400, damping: 14 }}
+                    className="group relative rounded-md p-0.5"
+                    style={{ background: b.color, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.25), 0 3px 0 rgba(0,0,0,0.3)' }}
+                    title={`${b.name} — ${b.tagline}`}
+                  >
+                    <Portrait spec={b.portrait} className="h-11 w-11" />
+                    <div className="txt absolute -bottom-4 left-1/2 -translate-x-1/2 text-[11px] font-bold">{b.name}</div>
+                  </motion.div>
+                ))}
+              </div>
+            </Field>
+            <Field label="Starting chips" className="mt-3">
+              <Segmented options={[500, 1000, 2000]} value={settings.startingStack} onChange={(v) => update({ startingStack: v })} format={(v) => `$${v.toLocaleString()}`} />
+            </Field>
+            <Field label="Blinds">
+              <Segmented options={[10, 20, 50]} value={settings.bigBlind} onChange={(v) => update({ bigBlind: v })} format={(v) => `${v / 2}/${v}`} />
+            </Field>
+            <div className="mt-1 grid grid-cols-[1fr_2fr] gap-2">
+              <button className="pbtn pbtn-orange text-lg" onClick={() => setSetup(false)}>
+                Back
+              </button>
+              <button className="pbtn pbtn-red py-3 text-2xl" onClick={() => startGame(settings)}>
+                Sit down
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Segmented<T extends number>({ options, value, onChange, format }: { options: T[]; value: T; onChange: (v: T) => void; format?: (v: T) => string }) {
   return (
-    <div>
-      <div className="mb-1.5 font-display text-sm uppercase tracking-widest text-cream/60">{label}</div>
+    <div className="pinset flex gap-1 p-1">
+      {options.map((o) => (
+        <button key={o} className={`pbtn flex-1 px-0 py-1 text-lg ${value === o ? 'pbtn-gold' : 'pbtn-slate'}`} onClick={() => onChange(o)}>
+          {format ? format(o) : o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <div className="txt mb-1 text-sm font-semibold uppercase tracking-wider text-white/80">{label}</div>
       {children}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Table screen
+
 export function TableScreen() {
   const view = useGame((s) => s.view)!;
-  const settings = useGame((s) => s.settings);
   const showRankings = useGame((s) => s.showRankings);
   const setShowRankings = useGame((s) => s.setShowRankings);
-  const muted = useGame((s) => s.muted);
-  const toggleMute = useGame((s) => s.toggleMute);
-  const quit = useGame((s) => s.quitToMenu);
-  const [showLog, setShowLog] = useState(false);
+  const showLog = useGame((s) => s.showLog);
+  const toggleLog = useGame((s) => s.toggleLog);
+  const shake = useGame((s) => s.shake);
+  const controls = useAnimationControls();
+  const myLabel = useMemo(() => lastActionLabels(view)[HUMAN_SEAT], [view]);
+
+  useEffect(() => {
+    if (shake === 0) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    void controls.start({ x: [0, -9, 8, -6, 5, -2, 0], y: [0, 4, -5, 3, -2, 0], transition: { duration: 0.45 } });
+  }, [shake, controls]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -125,43 +202,31 @@ export function TableScreen() {
   }, [setShowRankings]);
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-6xl flex-col px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 sm:px-4">
-      <header className="flex items-center gap-2">
-        <button className="btn btn-dark px-3 py-1 text-sm" onClick={quit}>
-          ← Menu
-        </button>
-        <div className="font-display text-2xl text-mustard" style={{ textShadow: '0 3px 0 #a82a35' }}>
-          {GAME_TITLE}
-        </div>
-        <div className="ml-1 hidden font-display text-sm text-cream/60 sm:block">
-          Hand #{view.handNumber} · Blinds {view.config.smallBlind}/{view.config.bigBlind}
-        </div>
-        <div className="ml-auto flex gap-1.5">
-          <button className="btn btn-dark px-3 py-1 text-sm" onClick={() => setShowLog((v) => !v)}>
-            Log
-          </button>
-          <button className="btn btn-dark px-3 py-1 text-sm" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-            {muted ? '🔇' : '🔊'}
-          </button>
-          <button className="btn btn-gold px-3 py-1 text-sm" onClick={() => setShowRankings(true)}>
-            Hands
-          </button>
-        </div>
-      </header>
-
-      <div className="relative min-h-0 flex-1 py-1">
-        <Table view={view} />
-        <AnimatePresence>{showLog && <ActionFeed onClose={() => setShowLog(false)} />}</AnimatePresence>
+    <motion.div animate={controls} className="grid h-[100dvh] grid-rows-[auto_1fr] lg:grid-cols-[17.5rem_1fr] lg:grid-rows-1">
+      <div className="hidden lg:block">
+        <Hud view={view} />
+      </div>
+      <div className="lg:hidden">
+        <HudStrip view={view} />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <HandArea view={view} />
+      <main className="relative flex min-h-0 flex-col gap-2 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-4 sm:px-4 sm:pt-6">
+        <Opponents view={view} />
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+          <Board view={view} />
+          {/* Phones: float over the bottom of the board. Larger screens: reserved space below it. */}
+          <div className="absolute inset-x-0 bottom-0 flex justify-center sm:static sm:h-16 sm:items-start">
+            <ResultBanner view={view} />
+          </div>
+        </div>
+        <MyHand view={view} label={myLabel} />
         <ActionBar view={view} />
-      </div>
+        <AnimatePresence>{showLog && <ActionFeed onClose={toggleLog} />}</AnimatePresence>
+      </main>
 
       <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
-      <GameOver startingStack={settings.startingStack} />
-    </div>
+      <GameOver />
+    </motion.div>
   );
 }
 
@@ -175,17 +240,17 @@ function ActionFeed({ onClose }: { onClose: () => void }) {
       initial={{ x: 40, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 40, opacity: 0 }}
-      className="panel absolute right-0 top-2 z-40 flex max-h-[70%] w-64 flex-col p-2"
+      className="ppanel absolute right-2 top-2 z-50 flex max-h-[60%] w-64 flex-col p-2"
     >
       <div className="mb-1 flex items-center justify-between">
-        <span className="font-display text-mustard">This hand</span>
-        <button className="text-cream/60 hover:text-cream" onClick={onClose}>
+        <span className="txt font-bold text-gold">This hand</span>
+        <button className="pbtn pbtn-red px-2 py-0 text-sm" onClick={onClose}>
           ✕
         </button>
       </div>
-      <div className="overflow-y-auto text-xs leading-relaxed">
+      <div className="pinset overflow-y-auto p-1.5 text-xs leading-relaxed">
         {lines.map((l) => (
-          <div key={l.key} className={l.tone === 'muted' ? 'text-cream/45' : l.tone === 'gold' ? 'font-bold text-mustard' : 'text-cream/90'}>
+          <div key={l.key} className={l.tone === 'muted' ? 'text-white/50' : l.tone === 'gold' ? 'font-bold text-gold' : 'text-white/90'}>
             {l.text}
           </div>
         ))}
@@ -195,7 +260,7 @@ function ActionFeed({ onClose }: { onClose: () => void }) {
   );
 }
 
-function GameOver({ startingStack }: { startingStack: number }) {
+function GameOver() {
   const gameOver = useGame((s) => s.gameOver);
   const view = useGame((s) => s.view);
   const handsPlayed = useGame((s) => s.handsPlayed);
@@ -209,35 +274,35 @@ function GameOver({ startingStack }: { startingStack: number }) {
   return (
     <AnimatePresence>
       {gameOver && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-        >
+        <motion.div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.2 }}>
           <motion.div
-            className="panel flex w-full max-w-sm flex-col items-center gap-3 p-6 text-center"
-            initial={{ scale: 0.5, rotate: -6 }}
+            className="ppanel flex w-full max-w-sm flex-col gap-2 p-3 text-center"
+            initial={{ scale: 0.3, rotate: -10 }}
             animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 1.5, type: 'spring', stiffness: 260, damping: 14 }}
+            transition={{ delay: 2.2, type: 'spring', stiffness: 260, damping: 12 }}
           >
-            <div className="font-display text-5xl" style={{ color: won ? '#f5b83d' : '#e04848', textShadow: '0 4px 0 rgba(0,0,0,0.4)' }}>
-              {won ? 'You win!' : 'Busted!'}
+            <div className="txt rounded-lg py-2 text-4xl font-bold" style={{ background: won ? '#b88a12' : '#f0503f', boxShadow: '0 4px 0 rgba(0,0,0,0.35)' }}>
+              {won ? 'TABLE CLEARED' : 'BUSTED'}
             </div>
-            <p className="text-cream/80">
-              {won
-                ? `You took every chip at the table in ${handsPlayed} hands. Ice cold.`
-                : `You lasted ${handsPlayed} hands. Every pro has busted thousands of times — shuffle up and go again.`}
-            </p>
-            <div className="font-display text-mustard">
-              Final stack: {me.stack.toLocaleString()} (started with {startingStack.toLocaleString()})
+            <div className="pinset txt p-2 text-white/90">
+              {won ? `You took every chip in ${handsPlayed} hands.` : `You lasted ${handsPlayed} hands. Every pro has busted thousands of times.`}
             </div>
-            <div className="mt-2 flex w-full gap-2">
-              <button className="btn btn-dark flex-1" onClick={quit}>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="ppanel p-1">
+                <div className="txt text-xs text-white/70">Hands</div>
+                <div className="pinset txt text-2xl font-bold text-blue">{handsPlayed}</div>
+              </div>
+              <div className="ppanel p-1">
+                <div className="txt text-xs text-white/70">Final stack</div>
+                <div className="pinset txt text-2xl font-bold text-gold">${me.stack.toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <button className="pbtn pbtn-orange text-xl" onClick={quit}>
                 Menu
               </button>
-              <button className="btn btn-red flex-1" onClick={() => startGame(settings)}>
-                New game
+              <button className="pbtn pbtn-blue text-xl" onClick={() => startGame(settings)}>
+                New run
               </button>
             </div>
           </motion.div>

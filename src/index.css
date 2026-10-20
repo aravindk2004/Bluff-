@@ -8,71 +8,98 @@ body,
   height: 100%;
 }
 
-body {
-  @apply bg-plum-deep font-body text-cream antialiased;
-  background:
-    radial-gradient(ellipse at 50% 35%, #4a2a50 0%, #2b1830 45%, #1c0f20 100%);
-  overscroll-behavior: none;
-  -webkit-tap-highlight-color: transparent;
+/* Jersey 10 runs small; nudge the base size up so labels stay readable. */
+html {
+  font-size: 125%;
 }
 
-/* Gentle CRT warmth: scanlines + vignette, never blocking input. */
+body {
+  @apply font-pixel text-white antialiased;
+  font-synthesis: none; /* Jersey 10 has one weight — never smear a fake bold */
+  background: #173f33;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+/* Every bit of text gets a hard pixel drop shadow. */
+.txt {
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* CRT: scanlines, soft vignette, faint flicker. Never blocks input. */
 .crt::before,
 .crt::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 100;
+  z-index: 200;
 }
 .crt::before {
-  background: repeating-linear-gradient(to bottom, rgba(255, 220, 180, 0.035) 0 1px, transparent 1px 3px);
-  mix-blend-mode: overlay;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 3px);
+  animation: flicker 6s infinite steps(1);
 }
 .crt::after {
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(10, 4, 12, 0.55) 100%);
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  47% { opacity: 0.85; }
+  48% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crt::before { animation: none; }
 }
 
 @layer components {
-  .btn {
-    @apply relative select-none rounded-xl px-4 py-2.5 font-display text-lg tracking-wide text-cream shadow-chunky
-      transition-[transform,filter,box-shadow] duration-100 hover:-translate-y-0.5 hover:brightness-110
-      active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-40;
-    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  /* Flat saturated button with a thick darker base that "presses" down. */
+  .pbtn {
+    @apply txt relative select-none rounded-lg px-4 py-2 font-pixel font-bold text-white transition-[transform,filter] duration-75
+      hover:brightness-110 active:translate-y-[4px] disabled:pointer-events-none disabled:opacity-35 disabled:saturate-50;
+    box-shadow: 0 4px 0 0 var(--base, rgba(0, 0, 0, 0.4));
   }
-  .btn-red { @apply bg-crimson; }
-  .btn-blue { @apply bg-sky; }
-  .btn-gold { @apply bg-mustard text-ink; text-shadow: none; }
-  .btn-dark { @apply bg-plum-light; }
-  .btn-green { @apply bg-felt-light; }
+  .pbtn:active {
+    box-shadow: 0 0 0 0 var(--base);
+  }
+  .pbtn-blue { @apply bg-blue; --base: #1a5ea6; }
+  .pbtn-red { @apply bg-red; --base: #a3302a; }
+  .pbtn-orange { @apply bg-orange; --base: #a3530a; }
+  .pbtn-green { @apply bg-green; --base: #22704a; }
+  .pbtn-purple { @apply bg-purple; --base: #5a3698; }
+  .pbtn-slate { @apply bg-slate-edge; --base: #2c3a3e; }
+  .pbtn-gold { @apply bg-gold text-ink; --base: #b88a12; text-shadow: none; }
 
-  .panel {
-    @apply rounded-2xl border-2 border-black/40 bg-plum/95 shadow-chunky;
+  /* Rounded slate panel with a light rim, like a well-worn arcade cabinet. */
+  .ppanel {
+    @apply rounded-xl bg-slate;
+    box-shadow: inset 0 0 0 2px #5d7277, 0 4px 0 0 rgba(0, 0, 0, 0.35);
   }
-
-  .felt {
-    background:
-      radial-gradient(ellipse at 50% 40%, #2a8a6e 0%, #1d6b55 45%, #124537 100%);
+  .pinset {
+    @apply rounded-lg bg-slate-deep;
   }
-  .felt-noise {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
-    mix-blend-mode: overlay;
+  .ptray {
+    @apply rounded-2xl bg-black/25;
+    box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.25), inset 0 -2px 0 rgba(255, 255, 255, 0.06);
   }
 
   .card-back {
-    background-color: #c23440;
+    background-color: #d6453c;
     background-image:
-      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.09) 0 6px, transparent 6px 12px),
-      repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 0 6px, transparent 6px 12px);
+      linear-gradient(45deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.16) 75%),
+      linear-gradient(45deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.16) 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 6px 6px;
   }
 }
 
-input[type='range'].slider {
-  @apply h-3 w-full cursor-pointer appearance-none rounded-full bg-black/40;
+input[type='range'].pslider {
+  @apply h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-deep;
 }
-input[type='range'].slider::-webkit-slider-thumb {
-  @apply h-7 w-7 appearance-none rounded-full border-4 border-ink bg-mustard shadow-chunky-sm;
+input[type='range'].pslider::-webkit-slider-thumb {
+  @apply h-6 w-6 appearance-none rounded-md bg-gold;
+  box-shadow: 0 3px 0 #b88a12;
 }
-input[type='range'].slider::-moz-range-thumb {
-  @apply h-6 w-6 rounded-full border-4 border-ink bg-mustard;
+input[type='range'].pslider::-moz-range-thumb {
+  @apply h-6 w-6 rounded-md border-0 bg-gold;
 }

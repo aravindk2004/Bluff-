@@ -27,6 +27,12 @@ interface Store {
   handsPlayed: number;
   muted: boolean;
   showRankings: boolean;
+  /** Increments to trigger a screen shake (all-ins, big wins). */
+  shake: number;
+  /** Your chip change on the previous hand. */
+  lastNet: number | null;
+  showLog: boolean;
+  toggleLog: () => void;
 
   startGame: (settings: Settings) => void;
   act: (action: Action) => void;
@@ -50,6 +56,10 @@ export const useGame = create<Store>((set, get) => ({
   handsPlayed: 0,
   muted: false,
   showRankings: false,
+  shake: 0,
+  lastNet: null,
+  showLog: false,
+  toggleLog: () => set({ showLog: !get().showLog }),
 
   startGame: (settings) => {
     controller?.stop();
@@ -77,6 +87,7 @@ export const useGame = create<Store>((set, get) => ({
       const fresh = s.handNumber !== seen.hand ? s.log : s.log.slice(seen.len);
       seen = { hand: s.handNumber, len: s.log.length };
       playSoundsFor(fresh);
+      if (fresh.some((e) => e.kind === 'action' && e.allIn)) set({ shake: get().shake + 1 });
       set({ view: playerView(s, HUMAN_SEAT) });
     });
     set({
@@ -87,6 +98,7 @@ export const useGame = create<Store>((set, get) => ({
       gameOver: false,
       handsPlayed: 0,
       handRunning: false,
+      lastNet: null,
     });
     get().nextHand();
   },
@@ -106,7 +118,13 @@ export const useGame = create<Store>((set, get) => ({
       const humanBroke = s.seats[HUMAN_SEAT].stack === 0;
       const result = s.result;
       if (result) play(result.netBySeat[HUMAN_SEAT] > 0 ? 'win' : result.netBySeat[HUMAN_SEAT] < 0 ? 'lose' : 'chip');
-      set({ handRunning: false, handsPlayed: get().handsPlayed + 1, gameOver: humanBroke || isGameOver(s) });
+      if (result && result.netBySeat[HUMAN_SEAT] >= s.config.bigBlind * 15) set({ shake: get().shake + 1 });
+      set({
+        handRunning: false,
+        handsPlayed: get().handsPlayed + 1,
+        gameOver: humanBroke || isGameOver(s),
+        lastNet: result?.netBySeat[HUMAN_SEAT] ?? null,
+      });
     });
   },
 

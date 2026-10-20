@@ -28,45 +28,45 @@ export function HandRankings({ open, onClose }: { open: boolean; onClose: () => 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-2 sm:items-center sm:p-6"
+          className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-2 sm:items-center sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="panel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-4"
+            className="ppanel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-3"
             initial={{ y: 60, scale: 0.95 }}
             animate={{ y: 0, scale: 1 }}
             exit={{ y: 60, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 320, damping: 26 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-2xl text-mustard">Hand Rankings</h2>
-              <button className="btn btn-dark px-3 py-1 text-base" onClick={onClose}>
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="txt flex-1 rounded-lg bg-red py-1 text-center text-2xl font-bold" style={{ boxShadow: '0 4px 0 #a3302a' }}>Hand Rankings</h2>
+              <button className="pbtn pbtn-orange px-3 py-1 text-base" onClick={onClose}>
                 Close
               </button>
             </div>
-            <p className="mb-3 text-sm text-cream/70">
+            <p className="pinset txt mb-3 p-2 text-sm text-white/85">
               Your best 5 cards out of 7 (your 2 + the 5 on the board) count. Higher on this list beats lower.
               Same type? Higher cards win; exact ties split the pot.
             </p>
             <ol className="flex flex-col gap-2">
               {RANKINGS.map((r, i) => (
-                <li key={r.name} className="flex flex-col gap-2 rounded-xl bg-black/25 p-2 sm:flex-row sm:items-center">
+                <li key={r.name} className="pinset flex flex-col gap-2 p-2 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-2 sm:w-56">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mustard font-display text-ink">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue font-bold txt">
                       {i + 1}
                     </span>
                     <div>
-                      <div className="font-display text-lg leading-tight">{r.name}</div>
-                      <div className="text-xs leading-snug text-cream/60">{r.blurb}</div>
+                      <div className="txt text-lg font-bold leading-tight">{r.name}</div>
+                      <div className="text-xs leading-snug text-white/70">{r.blurb}</div>
                     </div>
                   </div>
                   <div className="flex gap-1">
                     {parseCards(r.cards).map((c) => (
-                      <PlayingCard key={c} card={c} size="sm" flip={false} />
+                      <PlayingCard key={c} card={c} width="min(11vw, 52px)" from={{ x: 0, y: 0 }} interactive={false} wobble={false} />
                     ))}
                   </div>
                 </li>
