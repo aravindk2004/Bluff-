@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { DrillId } from '../coach/drills';
+import { play } from './sfx';
 
 /** Player progress and School settings, saved in this browser. */
 
@@ -79,6 +80,7 @@ export const useProgress = create<ProgressState>((set, get) => {
   const toast = (t: Omit<Toast, 'id'>) => {
     const id = ++toastId;
     set({ toasts: [...get().toasts, { ...t, id }] });
+    play(t.kind === 'badge' ? 'fanfare' : 'ding');
     setTimeout(() => get().dismissToast(id), t.kind === 'badge' ? 3600 : 1800);
   };
   return {

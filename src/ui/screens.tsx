@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionBar } from './ActionBar';
+import { musicEnabled, setMusicEnabled } from './audio/music';
 import { type Mood } from './Background';
 import { BOTS } from './bots';
 import { feedLines, lastActionLabels } from './derive';
@@ -151,7 +152,32 @@ export function Menu() {
           </motion.div>
         )}
       </AnimatePresence>
+      <SoundToggles />
       <HandRankings open={showRankings} onClose={() => setShowRankings(false)} />
+    </div>
+  );
+}
+
+/** Music and sound-effect switches on the opening screen (remembered in this browser). */
+function SoundToggles() {
+  const [music, setMusic] = useState(musicEnabled());
+  const muted = useGame((s) => s.muted);
+  const toggleMute = useGame((s) => s.toggleMute);
+  return (
+    <div className="flex gap-2">
+      <button
+        className={`pbtn px-3 py-1 text-base ${music ? 'pbtn-purple' : 'pbtn-slate'}`}
+        aria-pressed={music}
+        onClick={() => {
+          setMusicEnabled(!music);
+          setMusic(!music);
+        }}
+      >
+        ♪ Music {music ? 'on' : 'off'}
+      </button>
+      <button className={`pbtn px-3 py-1 text-base ${muted ? 'pbtn-slate' : 'pbtn-purple'}`} aria-pressed={!muted} onClick={toggleMute}>
+        Sounds {muted ? 'off' : 'on'}
+      </button>
     </div>
   );
 }

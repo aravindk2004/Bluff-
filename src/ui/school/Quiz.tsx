@@ -85,7 +85,7 @@ export function QuizCard({ q, onAnswer, onNext, nextLabel = 'Next' }: { q: Quest
     if (answered) return;
     setPicked(i);
     const ok = q.options[i].correct;
-    play(ok ? 'win' : 'lose');
+    play(ok ? 'correct' : 'wrong');
     onAnswer?.(ok);
   };
 

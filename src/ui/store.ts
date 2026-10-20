@@ -6,7 +6,7 @@ import { type Action, createGame, type GameState, type HandEvent, isGameOver, ty
 import { HumanPlayer, TableController } from '../game/controller';
 import { BOTS } from './bots';
 import { useProgress } from './progress';
-import { play, setMuted } from './sfx';
+import { isMuted, play, setMuted } from './sfx';
 import { computeLiveOdds } from './useLiveOdds';
 
 export const HUMAN_SEAT = 0;
@@ -73,7 +73,7 @@ export const useGame = create<Store>((set, get) => ({
   handRunning: false,
   gameOver: false,
   handsPlayed: 0,
-  muted: false,
+  muted: isMuted(),
   showRankings: false,
   shake: 0,
   lastNet: null,
@@ -113,7 +113,7 @@ export const useGame = create<Store>((set, get) => ({
       const newHand = s.handNumber !== seen.hand;
       const fresh = newHand ? s.log : s.log.slice(seen.len);
       seen = { hand: s.handNumber, len: s.log.length };
-      playSoundsFor(fresh);
+      playSoundsFor(fresh, s);
       if (fresh.some((e) => e.kind === 'action' && e.allIn)) set({ shake: get().shake + 1 });
       const view = playerView(s, HUMAN_SEAT);
       set({ view, history: newHand ? [view] : [...get().history, view] });
@@ -153,7 +153,6 @@ export const useGame = create<Store>((set, get) => ({
       const humanBroke = s.seats[HUMAN_SEAT].stack === 0;
       const result = s.result;
       const net = result?.netBySeat[HUMAN_SEAT] ?? 0;
-      if (result) play(net > 0 ? 'win' : net < 0 ? 'lose' : 'chip');
       if (result && net >= s.config.bigBlind * 15) set({ shake: get().shake + 1 });
 
       const view = playerView(s, HUMAN_SEAT);
@@ -239,18 +238,22 @@ function rewardHand(report: HandReport, s: GameState) {
   if (s.seats[HUMAN_SEAT].stack >= s.config.startingStack * 2) p.award('doubleUp');
 }
 
-function playSoundsFor(fresh: HandEvent[]) {
-  // One of each sound per update, so a full deal doesn't stack a dozen identical blips.
-  const sounds = new Set<Parameters<typeof play>[0]>();
+/**
+ * Table sounds driven by game events. Card sounds (deal, flip, showdown pops) and your
+ * win/loss are played by the components so they land exactly with their animations.
+ */
+function playSoundsFor(fresh: HandEvent[], s: GameState) {
+  const bb = s.config.bigBlind;
   for (const e of fresh) {
-    if (e.kind === 'deal') sounds.add('deal');
-    else if (e.kind === 'street') sounds.add('flip');
-    else if (e.kind === 'action') {
-      if (e.allIn) sounds.add('allIn');
-      else if (e.action === 'fold') sounds.add('fold');
-      else if (e.action === 'check') sounds.add('check');
-      else sounds.add('chip');
+    if (e.kind === 'action') {
+      if (e.allIn) play('allIn');
+      else if (e.action === 'fold') play('fold');
+      else if (e.action === 'check') play('check');
+      // More chips, more clinks: 1 for a call of a blind or two, up to 4 for big bets.
+      else play('chip', 1 + Math.floor(Math.log2(Math.max(1, e.amount / bb))));
+    } else if (e.kind === 'street') {
+      // Bets get swept into the pot before the new cards land.
+      play('collect');
     }
   }
-  sounds.forEach(play);
 }

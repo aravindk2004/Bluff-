@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { blindSeats, type Card, type GameState, type SeatState } from '../engine';
 import { lastActionLabels, STREET_NAME } from './derive';
 import { CardSlot, PlayingCard } from './PlayingCard';
+import { playLater } from './sfx';
 import { HUMAN_SEAT } from './store';
 import { ChipIcon, deckRemaining, Portrait, profileFor } from './widgets';
 
@@ -32,7 +33,8 @@ export function useOutcome(view: GameState) {
     // Order of the winning five so they can "score" one after another.
     const best: Card[] = result && !result.uncontested ? result.shown.find((h) => winners.has(h.seat))?.bestFive ?? [] : [];
     const popOrder = new Map(best.map((c, i) => [c, runoutDelay + 0.4 + i * 0.16]));
-    return { result, winners, popOrder, runoutDelay, prevLen };
+    const popIndex = new Map(best.map((c, i) => [c, i]));
+    return { result, winners, popOrder, popIndex, runoutDelay, prevLen };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, view.handNumber, view.board.length]);
 }
@@ -122,6 +124,8 @@ function OpponentPanel({
                   from={{ x: 0, y: 120 }}
                   highlight={!!shown && outcome.popOrder.has(seat.holeCards[k])}
                   popDelay={outcome.popOrder.get(seat.holeCards[k])}
+                  popIndex={outcome.popIndex.get(seat.holeCards[k])}
+                  sound={shown ? 'flip' : 'deal'}
                   interactive={!!shown}
                   wobble={false}
                 />
@@ -170,7 +174,35 @@ function SeatBadge({ badge, className = '' }: { badge: 'D' | 'SB' | 'BB'; classN
   );
 }
 
-function NetPill({ net, delay, big }: { net: number; delay: number; big?: boolean }) {
+function NetPill({
+  net,
+  delay,
+  big,
+  withSound,
+  bigBlind = 0,
+  uncontested,
+}: {
+  net: number;
+  delay: number;
+  big?: boolean;
+  withSound?: boolean;
+  bigBlind?: number;
+  uncontested?: boolean;
+}) {
+  // Your result: coins when you win; a sad sting only for real showdown losses, not every folded blind.
+  useEffect(() => {
+    if (!withSound) return;
+    if (net > 0) {
+      const a = playLater('coins', delay);
+      const b = playLater('win', delay + 0.25);
+      return () => {
+        a();
+        b();
+      };
+    }
+    if (!uncontested && net <= -5 * bigBlind) return playLater('lose', delay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <motion.div
       initial={{ scale: 0, rotate: -15 }}
@@ -249,6 +281,8 @@ export function Board({ view }: { view: GameState }) {
                 highlight={highlight.has(c)}
                 dim={highlight.size > 0 && !highlight.has(c)}
                 popDelay={o.popOrder.get(c)}
+                popIndex={o.popIndex.get(c)}
+                sound={i >= o.prevLen ? 'flip' : undefined}
               />
             ) : (
               <CardSlot key={`slot-${i}`} width={BOARD_W} />
@@ -335,6 +369,8 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
               from={{ x: 380, y: -260, rotate: 40 }}
               highlight={o.popOrder.has(c)}
               popDelay={o.popOrder.get(c)}
+              popIndex={o.popIndex.get(c)}
+              sound="deal"
             />
           </div>
         ))}
@@ -344,7 +380,7 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
         {badge && <SeatBadge badge={badge} className="h-6 min-w-6 text-xs" />}
         <AnimatePresence mode="popLayout">
           {o.result && net !== 0 ? (
-            <NetPill key="net" net={net} big delay={o.runoutDelay + 1.2} />
+            <NetPill key="net" net={net} big delay={o.runoutDelay + 1.2} withSound bigBlind={view.config.bigBlind} uncontested={!!o.result?.uncontested} />
           ) : (
             label && <ActionPill key={label} label={label} />
           )}

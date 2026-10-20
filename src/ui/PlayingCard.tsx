@@ -1,7 +1,8 @@
 import { AnimatePresence, motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { type Card, RANK_NAMES, rankOf, suitOf } from '../engine';
 import { Sprite } from './pixel/Sprite';
+import { play, playLater } from './sfx';
 import { COURT_PALETTE, COURT_SPRITES, rankGlyph, SUIT_COLORS, SUIT_NAMES, SUIT_SPRITES } from './pixel/sprites';
 
 const RANK_LABEL: Record<number, string> = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
@@ -34,6 +35,10 @@ export interface CardProps {
   dim?: boolean;
   /** Showdown "scoring" pop delay (s), or undefined. */
   popDelay?: number;
+  /** Position in the scoring sequence; each pop rings a step higher. */
+  popIndex?: number;
+  /** Sound to play when the card lands: a dealt swish, or a flip snap. */
+  sound?: 'deal' | 'flip';
   /** Simple face (rank + one pip) for tiny cards. */
   compact?: boolean;
   interactive?: boolean;
@@ -49,6 +54,8 @@ export const PlayingCard = memo(function PlayingCard({
   highlight,
   dim,
   popDelay,
+  popIndex,
+  sound,
   compact,
   interactive = true,
   wobble = true,
@@ -64,6 +71,17 @@ export const PlayingCard = memo(function PlayingCard({
   const shineX = useTransform(mx, [0, 1], ['0%', '100%']);
   const shineY = useTransform(my, [0, 1], ['0%', '100%']);
   const shine = useMotionTemplate`radial-gradient(circle at ${shineX} ${shineY}, rgba(255,255,255,0.45), transparent 55%)`;
+
+  // Sounds are scheduled with the animation they belong to, once per mount.
+  useEffect(() => {
+    if (!sound) return;
+    return playLater(sound, sound === 'flip' ? delay + 0.15 : delay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (popDelay === undefined) return;
+    return playLater('pop', popDelay, popIndex ?? 0);
+  }, [popDelay, popIndex]);
 
   const onMove = (e: React.PointerEvent) => {
     if (!interactive || !ref.current) return;
@@ -111,7 +129,11 @@ export const PlayingCard = memo(function PlayingCard({
             style={{ rotateX: rx, rotateY: ry, transformPerspective: 500 }}
             whileHover={interactive ? { scale: 1.1, y: -8 } : undefined}
             onPointerMove={onMove}
-            onPointerEnter={() => interactive && setHover(true)}
+            onPointerEnter={(e) => {
+              if (!interactive) return;
+              setHover(true);
+              if (card && e.pointerType === 'mouse') play('hover');
+            }}
             onPointerLeave={onLeave}
           >
             {/* Flip */}
