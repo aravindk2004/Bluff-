@@ -1,54 +1,47 @@
-# React + TypeScript + Vite
+# Bluff (working title)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser No-Limit Texas Hold'em game that's fun *and* teaches beginners to play well.
+Play money only — no real-money features, ever.
 
-Currently, two official plugins are available:
+## Run it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # engine, AI and controller tests
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Layout
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
 ```
+src/
+  engine/        Pure rules engine — no React, no DOM, no Math.random
+    cards.ts       Card strings ("As", "Td"), deck, parsing
+    evaluator.ts   7-card hand evaluator + human descriptions
+    pots.ts        Main/side pot construction, odd-chip splitting
+    game.ts        createGame / startHand / legalActions / applyAction
+    types.ts       The single serializable GameState
+    view.ts        playerView(): what one seat may see (hides others' cards)
+    player.ts      Player interface: decide(view, legal, seat) => Promise<Action>
+  ai/            Monte Carlo equity + heuristic AI (implements Player)
+  game/          TableController (drives hands via Players) + HumanPlayer
+  ui/            React + Tailwind + Framer Motion table
+```
+
+### Design rules
+
+1. **The engine is pure.** Every function takes a `GameState` and returns a new one.
+   The RNG state lives in the game state (seeded mulberry32), so hands are fully reproducible.
+2. **One serializable state object** holds everything: deck, hole cards, bets, pot
+   contributions, whose turn, street, and an event log for replays.
+3. **One `Player` interface.** Human (UI), AI, and — in Phase 4 — remote network players all
+   implement `decide`. Players only ever receive `playerView(state, seat)`, never the deck or
+   other players' hole cards, so the same code path works for an authoritative server.
+
+### Rules implemented
+
+Blinds (with heads-up button/SB rule), optional antes, fold/check/call/bet/raise/all-in,
+min-raise = last full raise, incomplete all-in raises don't re-open betting (cumulative short
+all-ins do), uncalled bets returned, automatic all-in runouts, side pots, split pots with odd
+chips to the first winner left of the button, busted players skipped by the button.

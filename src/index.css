@@ -1,68 +1,78 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  @apply bg-plum-deep font-body text-cream antialiased;
+  background:
+    radial-gradient(ellipse at 50% 35%, #4a2a50 0%, #2b1830 45%, #1c0f20 100%);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Gentle CRT warmth: scanlines + vignette, never blocking input. */
+.crt::before,
+.crt::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+.crt::before {
+  background: repeating-linear-gradient(to bottom, rgba(255, 220, 180, 0.035) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+.crt::after {
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(10, 4, 12, 0.55) 100%);
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+@layer components {
+  .btn {
+    @apply relative select-none rounded-xl px-4 py-2.5 font-display text-lg tracking-wide text-cream shadow-chunky
+      transition-[transform,filter,box-shadow] duration-100 hover:-translate-y-0.5 hover:brightness-110
+      active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-40;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  }
+  .btn-red { @apply bg-crimson; }
+  .btn-blue { @apply bg-sky; }
+  .btn-gold { @apply bg-mustard text-ink; text-shadow: none; }
+  .btn-dark { @apply bg-plum-light; }
+  .btn-green { @apply bg-felt-light; }
+
+  .panel {
+    @apply rounded-2xl border-2 border-black/40 bg-plum/95 shadow-chunky;
+  }
+
+  .felt {
+    background:
+      radial-gradient(ellipse at 50% 40%, #2a8a6e 0%, #1d6b55 45%, #124537 100%);
+  }
+  .felt-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  .card-back {
+    background-color: #c23440;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.09) 0 6px, transparent 6px 12px),
+      repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 0 6px, transparent 6px 12px);
+  }
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+input[type='range'].slider {
+  @apply h-3 w-full cursor-pointer appearance-none rounded-full bg-black/40;
+}
+input[type='range'].slider::-webkit-slider-thumb {
+  @apply h-7 w-7 appearance-none rounded-full border-4 border-ink bg-mustard shadow-chunky-sm;
+}
+input[type='range'].slider::-moz-range-thumb {
+  @apply h-6 w-6 rounded-full border-4 border-ink bg-mustard;
 }
