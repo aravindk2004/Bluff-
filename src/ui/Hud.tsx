@@ -165,31 +165,31 @@ export function HudStrip({ view }: { view: GameState }) {
   const setShowRankings = useGame((s) => s.setShowRankings);
   const toggleLog = useGame((s) => s.toggleLog);
   return (
-    <div className="flex items-stretch gap-1.5 bg-slate-deep/80 p-1.5">
-      <div className="txt flex w-16 flex-col items-center justify-center rounded-lg text-center text-xs font-bold leading-tight" style={{ background: d.color }}>
+    <div className="flex min-w-0 items-stretch gap-1.5 bg-slate-deep/80 p-1.5" style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))' }}>
+      <div className="txt flex w-14 shrink-0 flex-col items-center justify-center rounded-lg text-center text-xs font-bold leading-tight" style={{ background: d.color }}>
         {d.streetLabel}
         <span className="text-[10px] text-white/80">#{view.handNumber}</span>
       </div>
-      <div className="ppanel flex flex-1 flex-col items-center justify-center px-1 py-0.5">
+      <div className="ppanel flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-0.5">
         <div className="text-[10px] text-white/70">Pot</div>
         <div className="txt flex items-center gap-1 text-lg font-bold leading-none text-red">
           <ChipIcon className="w-3" />
           <AnimatedNumber value={d.pot} />
         </div>
       </div>
-      <div className="ppanel flex flex-1 flex-col items-center justify-center px-1 py-0.5">
+      <div className="ppanel flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-0.5">
         <div className="text-[10px] text-white/70">Stack</div>
         <div className="txt text-lg font-bold leading-none text-gold">
           $<AnimatedNumber value={d.me.stack} />
         </div>
       </div>
-      <button className="pbtn pbtn-slate px-2 py-0 text-xs" onClick={toggleLog}>
+      <button className="pbtn pbtn-slate shrink-0 px-1.5 py-0 text-xs" onClick={toggleLog}>
         Log
       </button>
-      <button className="pbtn pbtn-red px-2 py-0 text-xs leading-tight" onClick={() => setShowRankings(true)}>
+      <button className="pbtn pbtn-red shrink-0 px-1.5 py-0 text-xs leading-tight" onClick={() => setShowRankings(true)}>
         Ranks
       </button>
-      <button className="pbtn pbtn-orange px-2 py-0 text-xs" onClick={quit}>
+      <button className="pbtn pbtn-orange shrink-0 px-1.5 py-0 text-xs" onClick={quit}>
         Menu
       </button>
     </div>

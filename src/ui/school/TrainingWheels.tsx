@@ -91,7 +91,7 @@ export function WheelsStrip({ view }: { view: GameState }) {
   if (!on || !odds) return null;
   const v = view.phase === 'betting' ? verdict(odds) : null;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
+    <div className="flex flex-wrap items-center justify-center gap-1 text-sm cramped:flex-nowrap cramped:justify-start cramped:overflow-x-auto cramped:whitespace-nowrap cramped:text-xs">
       <span className="txt rounded-md bg-slate-deep px-1.5">
         Win <span className="text-gold">{pct(odds.equity)}</span>
       </span>

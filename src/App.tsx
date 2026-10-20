@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { onAudioUnlock } from './ui/audio/core';
 import { startMusic, stopMusic } from './ui/audio/music';
 import { SwirlBackground } from './ui/Background';
 import { DrillScreen } from './ui/school/Drill';
@@ -32,15 +33,9 @@ export default function App() {
       return;
     }
     startMusic();
-    const unlock = () => {
+    return onAudioUnlock(() => {
       if (useGame.getState().screen === 'menu') startMusic();
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
+    });
   }, [screen]);
 
   return (

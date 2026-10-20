@@ -14,6 +14,12 @@ export default {
         purple: { DEFAULT: '#8b5cd6', dark: '#5a3698' },
         paper: { DEFAULT: '#f6f1e7', edge: '#cfc6b5' },
       },
+      screens: {
+        // Small phones in portrait (iPhone SE, compact Androids).
+        cramped: { raw: '(max-width: 639px) and (max-height: 760px)' },
+        // Phones held sideways.
+        short: { raw: '(max-height: 500px)' },
+      },
       fontFamily: {
         pixel: ['"Jersey 10"', 'ui-monospace', 'monospace'],
       },

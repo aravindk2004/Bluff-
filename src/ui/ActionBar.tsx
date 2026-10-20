@@ -7,6 +7,19 @@ import { buildDecision, HUMAN_SEAT, useGame } from './store';
 import { useOutcome } from './Table';
 import { ChipIcon } from './widgets';
 
+/** True while a CSS media query matches (updates on resize/rotation). */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatches(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return matches;
+}
+
 export function ActionBar({ view }: { view: GameState }) {
   const legal = useGame((s) => s.legal);
   const act = useGame((s) => s.act);
@@ -21,7 +34,7 @@ export function ActionBar({ view }: { view: GameState }) {
   const text =
     actor && view.toAct !== HUMAN_SEAT ? `${actor.name} is thinking` : view.seats[HUMAN_SEAT].folded ? 'You folded — watch how it plays out' : 'Dealing';
   return (
-    <div className="ptray mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center">
+    <div className="ptray mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center cramped:h-[3.75rem] short:h-12">
       <div className="txt text-lg text-white/75">
         {text}
         <Dots />
@@ -60,27 +73,39 @@ function NextHand({ onClick, view }: { onClick: () => void; view: GameState }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClick]);
   return (
-    <div className="mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center gap-2">
+    <div className="mx-auto flex h-[4.5rem] w-full max-w-3xl items-center justify-center cramped:h-[3.75rem] short:h-12 gap-2">
       {report && (
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay }} className="flex flex-col gap-1">
-          <button className="pbtn pbtn-purple px-3 py-1 text-base" onClick={() => setShowCoach(true)}>
-            Coach
-          </button>
-          <button className="pbtn pbtn-orange px-3 py-1 text-base" onClick={() => setShowReplay(true)}>
-            Replay
-          </button>
-        </motion.div>
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay }}
+          className="pbtn pbtn-purple shrink-0 px-3 py-2 text-base"
+          onClick={() => setShowCoach(true)}
+        >
+          Coach
+        </motion.button>
       )}
       <motion.button
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay, type: 'spring', stiffness: 300, damping: 13 }}
-        className="pbtn pbtn-blue flex flex-col items-center px-10 py-2 text-2xl leading-none"
+        className="pbtn pbtn-blue flex min-w-0 flex-col items-center px-5 py-2 text-xl leading-none sm:px-10 sm:text-2xl short:py-1 short:text-xl"
         onClick={onClick}
       >
         Deal next hand
-        <span className="mt-1 text-xs font-normal text-white/75">space</span>
+        <span className="mt-1 hidden text-xs font-normal text-white/75 sm:block">space</span>
       </motion.button>
+      {report && (
+        <motion.button
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay }}
+          className="pbtn pbtn-orange shrink-0 px-3 py-2 text-base"
+          onClick={() => setShowReplay(true)}
+        >
+          Replay
+        </motion.button>
+      )}
     </div>
   );
 }
@@ -100,7 +125,7 @@ function BigButton({
 }) {
   return (
     <button
-      className={`pbtn pbtn-${color} flex min-h-[3.75rem] flex-col items-center justify-center px-2 py-1.5 text-lg leading-none sm:text-2xl`}
+      className={`pbtn pbtn-${color} flex min-h-[3.75rem] flex-col items-center justify-center px-2 py-1.5 text-lg leading-none cramped:min-h-[3.25rem] sm:text-2xl short:min-h-[2.6rem] short:py-1 short:text-xl`}
       disabled={disabled}
       onClick={onClick}
     >
@@ -115,6 +140,10 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
   const nudgesOn = useProgress((s) => s.settings.nudges);
   const [nudge, setNudge] = useState<{ action: Action; title: string; text: string } | null>(null);
   const range = legal.bet ?? legal.raise;
+  // On phones the bet sizing panel stays tucked away until you tap Bet/Raise, saving space.
+  const isPhone = useMediaQuery('(max-width: 639px)');
+  const [sizingOpen, setSizingOpen] = useState(false);
+  const showSizing = !isPhone || sizingOpen;
   const isBet = !!legal.bet;
   const pot = collectedPot(view) + view.seats.reduce((s, p) => s + p.bet, 0);
   const [amount, setAmount] = useState(range?.min ?? 0);
@@ -145,8 +174,12 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
     setNudge(null);
     onAct(action);
   };
-  const submitAggro = () => {
+  const submitAggro = (fromKey = false) => {
     if (!range) return;
+    if (!showSizing && !fromKey) {
+      setSizingOpen(true);
+      return;
+    }
     tryAct(isAllIn ? { type: 'allIn' } : { type: isBet ? 'bet' : 'raise', amount });
   };
   const passive = () => tryAct(legal.check ? { type: 'check' } : { type: 'call' });
@@ -158,7 +191,7 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
       if (nudge) return;
       if (k === 'f' && legal.fold) tryAct({ type: 'fold' });
       else if (k === 'c' || k === 'k') passive();
-      else if ((k === 'r' || k === 'b') && range) submitAggro();
+      else if ((k === 'r' || k === 'b') && range) submitAggro(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -214,10 +247,10 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
       />
 
       {/* Sizing — full width row on phones */}
-      <div className="ppanel order-first col-span-3 flex flex-col gap-1.5 p-1.5 sm:order-none sm:col-span-1">
+      <div className={`ppanel order-first col-span-3 flex-col gap-1.5 p-1.5 sm:order-none sm:col-span-1 short:gap-1 short:p-1 ${showSizing ? 'flex' : 'hidden'}`}>
         {range ? (
           <>
-            <div className="grid grid-cols-5 gap-1">
+            <div className={`grid gap-1 ${isPhone ? 'grid-cols-[repeat(5,minmax(0,1fr))_auto]' : 'grid-cols-5'}`}>
               {(
                 [
                   ['Min', range.min],
@@ -235,6 +268,11 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
                   {label}
                 </button>
               ))}
+              {isPhone && (
+                <button className="pbtn pbtn-red px-2 py-0.5 text-sm" onClick={() => setSizingOpen(false)} aria-label="Hide bet sizing">
+                  ✕
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 px-0.5">
               <input
@@ -265,9 +303,11 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
 
       <BigButton
         color="orange"
-        label={isAllIn ? 'All-in!' : isBet ? 'Bet' : 'Raise'}
+        label={isAllIn && showSizing ? 'All-in!' : isBet ? 'Bet' : 'Raise'}
         sub={
-          range ? (
+          range && !showSizing ? (
+            'choose size'
+          ) : range ? (
             <>
               {isBet || isAllIn ? '' : 'to '}
               <ChipIcon className="w-3" /> {amount.toLocaleString()}
@@ -277,7 +317,7 @@ function Decision({ view, legal, onAct }: { view: GameState; legal: LegalActions
           )
         }
         disabled={!range}
-        onClick={submitAggro}
+        onClick={() => submitAggro()}
       />
     </motion.div>
   );

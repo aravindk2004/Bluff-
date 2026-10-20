@@ -34,7 +34,7 @@ export function useMood(): Mood {
 
 function WobblyTitle({ text }: { text: string }) {
   return (
-    <h1 className="flex select-none font-pixel text-[5.5rem] font-bold leading-none sm:text-[9rem]">
+    <h1 className="flex select-none font-pixel text-[5.5rem] font-bold leading-none sm:text-[9rem] short:text-[4.5rem]">
       {text.split('').map((ch, i) => (
         <motion.span
           key={i}
@@ -64,19 +64,19 @@ export function Menu() {
   const update = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 overflow-y-auto p-4">
+    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto p-4 [justify-content:safe_center] short:gap-3 short:p-2">
       <div className="relative flex flex-col items-center">
-        <div className={`pointer-events-none absolute -top-10 flex transition-opacity sm:-top-16 ${setup ? 'opacity-0' : ''}`}>
+        <div className={`pointer-events-none absolute -top-10 flex transition-opacity sm:-top-16 short:hidden ${setup ? 'opacity-0' : ''}`}>
           {(['Ks', 'Ah', 'Qd'] as const).map((c, i) => (
             <div key={c} className={i ? '-ml-6' : ''}>
               <PlayingCard card={c} width="min(16vw, 92px)" tilt={(i - 1) * 14} delay={0.3 + i * 0.12} from={{ x: 0, y: -200, rotate: 30 }} interactive={false} />
             </div>
           ))}
         </div>
-        <div className={setup ? 'mt-0' : 'mt-24 sm:mt-28'}>
+        <div className={setup ? 'mt-0 cramped:hidden short:hidden' : 'mt-24 sm:mt-28 short:mt-0'}>
           <WobblyTitle text={GAME_TITLE.toUpperCase()} />
         </div>
-        <div className="txt -mt-1 text-lg text-white/85">No-Limit Hold'em · play money only</div>
+        <div className={`txt -mt-1 text-lg text-white/85 ${setup ? 'cramped:hidden short:hidden' : ''}`}>No-Limit Hold'em · play money only</div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -111,9 +111,9 @@ export function Menu() {
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
-            className="ppanel flex w-full max-w-md flex-col gap-3 p-3"
+            className="ppanel flex w-full max-w-md flex-col gap-3 p-3 short:grid short:max-w-3xl short:grid-cols-2 short:gap-x-4 short:gap-y-2 short:p-2"
           >
-            <div className="txt rounded-lg bg-blue py-1.5 text-center text-2xl font-bold" style={{ boxShadow: '0 4px 0 #1a5ea6' }}>
+            <div className="txt rounded-lg bg-blue py-1.5 text-center text-2xl font-bold short:col-span-2 short:py-0.5 short:text-xl" style={{ boxShadow: '0 4px 0 #1a5ea6' }}>
               New table
             </div>
             <Field label="Opponents">
@@ -141,7 +141,7 @@ export function Menu() {
             <Field label="Blinds">
               <Segmented options={[10, 20, 50]} value={settings.bigBlind} onChange={(v) => update({ bigBlind: v })} format={(v) => `${v / 2}/${v}`} />
             </Field>
-            <div className="mt-1 grid grid-cols-[1fr_2fr] gap-2">
+            <div className="mt-1 grid grid-cols-[1fr_2fr] gap-2 short:col-span-2 short:mt-0">
               <button className="pbtn pbtn-orange text-lg" onClick={() => setSetup(false)}>
                 Back
               </button>
@@ -232,7 +232,7 @@ export function TableScreen() {
   }, [setShowRankings]);
 
   return (
-    <motion.div animate={controls} className="grid h-[100dvh] grid-rows-[auto_1fr] lg:grid-cols-[17.5rem_1fr] lg:grid-rows-1">
+    <motion.div animate={controls} className="grid h-[100dvh] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:grid-rows-1">
       <div className="hidden lg:block">
         <Hud view={view} />
       </div>
@@ -241,20 +241,26 @@ export function TableScreen() {
       </div>
 
       <main
-        className={`relative flex min-h-0 flex-col gap-2 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-4 transition-[padding] duration-300 sm:px-4 sm:pt-6 ${coachOpen ? 'xl:pr-[23.5rem]' : ''}`}
+        className={`relative flex min-h-0 flex-col gap-2 overflow-x-clip px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-4 transition-[padding] duration-300 sm:px-4 sm:pt-6 short:gap-1 short:pt-1 ${coachOpen ? 'xl:pr-[23.5rem]' : ''}`}
+        style={{ paddingLeft: 'max(0.5rem, env(safe-area-inset-left))', paddingRight: coachOpen ? undefined : 'max(0.5rem, env(safe-area-inset-right))' }}
       >
         <Opponents view={view} />
-        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
-          <Board view={view} />
-          {/* Phones: float over the bottom of the board. Larger screens: reserved space below it. */}
-          <div className="absolute inset-x-0 bottom-0 flex justify-center sm:static sm:h-16 sm:items-start">
-            <ResultBanner view={view} />
+        {/* Board above your cards; side by side when a phone is held sideways. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-2 short:flex-row short:items-center short:justify-center short:gap-6">
+          <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 short:flex-none">
+            <Board view={view} />
+            {/* Phones: float over the bottom of the board. Larger screens: reserved space below it. */}
+            <div className="absolute inset-x-0 bottom-0 flex justify-center sm:static sm:h-16 sm:items-start short:absolute short:h-auto">
+              <ResultBanner view={view} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 short:gap-1">
+            <div className="lg:hidden">
+              <WheelsStrip view={view} />
+            </div>
+            <MyHand view={view} label={myLabel} />
           </div>
         </div>
-        <div className="lg:hidden">
-          <WheelsStrip view={view} />
-        </div>
-        <MyHand view={view} label={myLabel} />
         <ActionBar view={view} />
         <AnimatePresence>{showLog && <ActionFeed onClose={toggleLog} />}</AnimatePresence>
       </main>

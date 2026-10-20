@@ -8,9 +8,10 @@ import { HUMAN_SEAT } from './store';
 import { ChipIcon, deckRemaining, Portrait, profileFor } from './widgets';
 
 const TURN_SECONDS = 30;
-export const BOARD_W = 'min(10.5vh, 17vw, 104px)';
-export const HAND_W = 'min(17vh, 25vw, 150px)';
-const MINI_W = 'min(4.4vh, 7vw, 38px)';
+// Sizes come from CSS variables in index.css so they adapt to phone portrait/landscape.
+export const BOARD_W = 'var(--board-w)';
+export const HAND_W = 'var(--hand-w)';
+const MINI_W = 'var(--mini-w)';
 
 /** Delay (s) for board card `i` given how many were already showing — streets land one after another. */
 function boardDelay(i: number, prevLen: number) {
@@ -45,7 +46,7 @@ export function Opponents({ view }: { view: GameState }) {
   const { sb, bb } = view.handNumber > 0 ? blindSeats(view) : { sb: -1, bb: -1 };
   const seats = view.seats.map((p, i) => ({ p, i })).filter(({ i }) => i !== HUMAN_SEAT);
   return (
-    <div className="grid grid-cols-3 justify-items-center gap-x-1.5 gap-y-9 pt-9 sm:flex sm:justify-center sm:gap-3 sm:pt-12">
+    <div className="grid grid-cols-3 justify-items-center gap-x-1.5 gap-y-9 pt-9 cramped:gap-y-1 cramped:pt-2 sm:flex sm:justify-center sm:gap-3 sm:pt-12 short:pt-8">
       {seats.map(({ p, i }) => (
         <OpponentPanel
           key={p.id}
@@ -99,11 +100,11 @@ function OpponentPanel({
       >
         <div className="flex items-center gap-1.5">
           <div className="relative shrink-0 rounded-md p-0.5" style={{ background: prof.color, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.25)' }}>
-            <Portrait spec={prof.portrait} className="h-9 w-9 sm:h-11 sm:w-11" />
+            <Portrait spec={prof.portrait} className="h-9 w-9 cramped:h-8 cramped:w-8 sm:h-11 sm:w-11 short:h-8 short:w-8" />
             {badge && <SeatBadge badge={badge} className="absolute -left-2 -top-2" />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="txt truncate text-sm font-bold leading-tight sm:text-base">{seat.name}</div>
+            <div className="txt truncate text-sm font-bold leading-tight cramped:pr-2 sm:text-base">{seat.name}</div>
             <div className="pinset txt mt-0.5 px-1 text-sm font-bold leading-tight text-gold sm:text-base">
               {seat.out ? 'OUT' : `$${seat.stack.toLocaleString()}`}
             </div>
@@ -111,13 +112,17 @@ function OpponentPanel({
         </div>
         {/* Hole cards peek out of the top-right corner */}
         {!seat.out && view.handNumber > 0 && !seat.folded && (
-          <div className="pointer-events-auto absolute bottom-[calc(100%-10px)] left-1/2 flex -translate-x-1/2">
+          <div
+            className={`pointer-events-auto absolute bottom-[calc(100%-10px)] left-1/2 flex -translate-x-1/2 ${
+              shown ? '' : 'cramped:-top-1.5 cramped:bottom-auto cramped:left-auto cramped:right-0.5 cramped:translate-x-0'
+            }`}
+          >
             {[0, 1].map((k) => (
               <div key={k} className={k ? (shown ? '-ml-1' : '-ml-3') : ''}>
                 <PlayingCard
                   key={`${view.handNumber}-${index}-${k}-${seat.holeCards[k] ?? 'down'}`}
                   card={seat.holeCards[k]}
-                  width={shown ? 'min(5.6vh, 9vw, 48px)' : MINI_W}
+                  width={shown ? 'var(--shown-w)' : MINI_W}
                   compact
                   tilt={k ? 8 : -6}
                   delay={shown ? outcome.runoutDelay : 0.1 * index + k * 0.35}
@@ -137,7 +142,7 @@ function OpponentPanel({
       </motion.div>
 
       {/* Bubble: action / bet / result */}
-      <div className="mt-1 flex h-6 items-center gap-1">
+      <div className="mt-1 flex h-6 items-center gap-1 short:mt-0.5 short:h-5">
         <AnimatePresence mode="popLayout">
           {outcome.result && net !== 0 ? (
             <NetPill key="net" net={net} delay={outcome.runoutDelay + (net > 0 ? 1.1 : 0.3)} />
@@ -263,7 +268,7 @@ export function Board({ view }: { view: GameState }) {
   const remaining = deckRemaining(view);
   return (
     <div className="flex w-full items-center justify-center gap-2 sm:gap-4">
-      <div className="ptray relative flex flex-col items-center gap-1 px-2 pb-2 pt-7 sm:px-4 sm:pt-8">
+      <div className="ptray relative flex flex-col items-center gap-1 px-2 pb-2 pt-7 cramped:pt-5 sm:px-4 sm:pt-8 short:pb-1.5 short:pt-5">
         <div className="txt absolute left-3 top-1 text-xs text-white/70">
           {view.handNumber > 0 ? (view.phase === 'betting' ? STREET_NAME[view.street] : 'Final board') : ''}
         </div>
@@ -357,8 +362,8 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
   const { sb, bb } = blindSeats(view);
   const badge = view.button === HUMAN_SEAT ? 'D' : sb === HUMAN_SEAT ? 'SB' : bb === HUMAN_SEAT ? 'BB' : null;
   return (
-    <div className="relative flex items-end justify-center">
-      <div className={`flex ${me.folded ? 'opacity-50 grayscale' : ''}`}>
+    <div className="flex items-end justify-center">
+      <div className={`relative flex ${me.folded ? 'opacity-50 grayscale' : ''}`}>
         {me.holeCards.map((c, k) => (
           <div key={`${view.handNumber}-${c}`} className={k ? '-ml-3' : ''}>
             <PlayingCard
@@ -376,7 +381,8 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
         ))}
       </div>
       {/* Your status, beside the cards */}
-      <div className="absolute left-[calc(50%+min(17vh,25vw,150px)+0.25rem)] top-2 flex flex-col items-start gap-1">
+      <div className="relative">
+      <div className="absolute bottom-[calc(var(--hand-w)*0.75)] left-1 flex max-w-[25vw] flex-col items-start gap-1">
         {badge && <SeatBadge badge={badge} className="h-6 min-w-6 text-xs" />}
         <AnimatePresence mode="popLayout">
           {o.result && net !== 0 ? (
@@ -386,6 +392,7 @@ export function MyHand({ view, label }: { view: GameState; label: string | null 
           )}
           {me.bet > 0 && !o.result && <BetPill key={`bet-${view.street}`} amount={me.bet} />}
         </AnimatePresence>
+      </div>
       </div>
     </div>
   );

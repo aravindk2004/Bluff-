@@ -58,6 +58,29 @@ export function audio(): AudioContext | null {
   return ctx;
 }
 
+/**
+ * Phones only unlock audio when a tap *ends* (pointerup/touchend/click), not on pointerdown,
+ * and they suspend it again after calls or app switches. So on every such gesture we resume
+ * the context and tell listeners (e.g. the menu music) that sound is available.
+ */
+const unlockers = new Set<() => void>();
+
+export function onAudioUnlock(fn: () => void): () => void {
+  unlockers.add(fn);
+  return () => unlockers.delete(fn);
+}
+
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    const a = audio();
+    if (!a) return;
+    a.resume()
+      .then(() => unlockers.forEach((f) => f()))
+      .catch(() => {});
+  };
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, { capture: true, passive: true });
+}
+
 export function buses() {
   audio();
   return { sfx: sfxBus, music: musicBus };
